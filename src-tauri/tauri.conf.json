@@ -12,13 +12,15 @@
   "app": {
     "windows": [
       {
-        "title": "atlas",
-        "width": 800,
-        "height": 600
+        "title": "Atlas",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src https://api.twelvedata.com https://api.coingecko.com https://api.alphavantage.co ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "bundle": {
