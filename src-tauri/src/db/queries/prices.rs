@@ -1,5 +1,4 @@
 use crate::models::{OHLCVRow, PriceCacheMeta};
-use rust_decimal::Decimal;
 use rusqlite::{params, Connection};
 
 pub fn upsert_prices(conn: &Connection, rows: &[OHLCVRow]) -> anyhow::Result<()> {
@@ -19,11 +18,11 @@ pub fn upsert_prices(conn: &Connection, rows: &[OHLCVRow]) -> anyhow::Result<()>
             stmt.execute(params![
                 row.asset_id,
                 row.ts,
-                row.open.map(decimal_to_f64),
-                row.high.map(decimal_to_f64),
-                row.low.map(decimal_to_f64),
-                decimal_to_f64(row.close),
-                row.volume.map(decimal_to_f64),
+                row.open,
+                row.high,
+                row.low,
+                row.close,
+                row.volume,
             ])?;
         }
     }
@@ -44,7 +43,10 @@ pub fn get_prices(
         (Some(_), None) => {
             "SELECT id, asset_id, ts, open, high, low, close, volume FROM historical_prices WHERE asset_id = ?1 AND ts >= ?2 ORDER BY ts ASC"
         }
-        _ => {
+        (None, Some(_)) => {
+            "SELECT id, asset_id, ts, open, high, low, close, volume FROM historical_prices WHERE asset_id = ?1 AND ts <= ?2 ORDER BY ts ASC"
+        }
+        (None, None) => {
             "SELECT id, asset_id, ts, open, high, low, close, volume FROM historical_prices WHERE asset_id = ?1 ORDER BY ts ASC"
         }
     };
@@ -53,7 +55,8 @@ pub fn get_prices(
     let rows = match (from_ts, to_ts) {
         (Some(f), Some(t)) => stmt.query_map(params![asset_id, f, t], row_to_ohlcv)?,
         (Some(f), None) => stmt.query_map(params![asset_id, f], row_to_ohlcv)?,
-        _ => stmt.query_map(params![asset_id], row_to_ohlcv)?,
+        (None, Some(t)) => stmt.query_map(params![asset_id, t], row_to_ohlcv)?,
+        (None, None) => stmt.query_map(params![asset_id], row_to_ohlcv)?,
     };
 
     let mut result = Vec::new();
@@ -105,26 +108,16 @@ pub fn update_cache_meta(
     Ok(())
 }
 
-fn decimal_to_f64(d: Decimal) -> f64 {
-    use rust_decimal::prelude::ToPrimitive;
-    d.to_f64().unwrap_or(0.0)
-}
-
-fn f64_to_decimal(f: f64) -> Decimal {
-    use rust_decimal::prelude::FromPrimitive;
-    Decimal::from_f64(f).unwrap_or(Decimal::ZERO)
-}
-
 fn row_to_ohlcv(row: &rusqlite::Row) -> rusqlite::Result<OHLCVRow> {
     Ok(OHLCVRow {
         id: row.get(0)?,
         asset_id: row.get(1)?,
         ts: row.get(2)?,
-        open: row.get::<_, Option<f64>>(3)?.map(f64_to_decimal),
-        high: row.get::<_, Option<f64>>(4)?.map(f64_to_decimal),
-        low: row.get::<_, Option<f64>>(5)?.map(f64_to_decimal),
-        close: f64_to_decimal(row.get(6)?),
-        volume: row.get::<_, Option<f64>>(7)?.map(f64_to_decimal),
+        open: row.get(3)?,
+        high: row.get(4)?,
+        low: row.get(5)?,
+        close: row.get(6)?,
+        volume: row.get(7)?,
     })
 }
 
@@ -134,7 +127,6 @@ mod tests {
     use crate::db::test_db;
     use crate::db::queries::assets;
     use crate::models::AssetType;
-    use std::str::FromStr;
 
     fn setup_asset(conn: &rusqlite::Connection) -> String {
         let asset = assets::insert_asset(conn, "AAPL", "Apple", &AssetType::Stock, "USD").unwrap();
@@ -151,20 +143,20 @@ mod tests {
                 id: None,
                 asset_id: asset_id.clone(),
                 ts: 1700000000,
-                open: Some(Decimal::from_str("150.00").unwrap()),
-                high: Some(Decimal::from_str("155.00").unwrap()),
-                low: Some(Decimal::from_str("148.00").unwrap()),
-                close: Decimal::from_str("153.00").unwrap(),
-                volume: Some(Decimal::from_str("1000000").unwrap()),
+                open: Some(150.0),
+                high: Some(155.0),
+                low: Some(148.0),
+                close: 153.0,
+                volume: Some(1000000.0),
             },
             OHLCVRow {
                 id: None,
                 asset_id: asset_id.clone(),
                 ts: 1700086400,
-                open: Some(Decimal::from_str("153.00").unwrap()),
-                high: Some(Decimal::from_str("157.00").unwrap()),
-                low: Some(Decimal::from_str("152.00").unwrap()),
-                close: Decimal::from_str("156.00").unwrap(),
+                open: Some(153.0),
+                high: Some(157.0),
+                low: Some(152.0),
+                close: 156.0,
                 volume: None,
             },
         ];
@@ -188,12 +180,11 @@ mod tests {
             open: None,
             high: None,
             low: None,
-            close: Decimal::from_str("150.00").unwrap(),
+            close: 150.0,
             volume: None,
         };
         upsert_prices(&conn, &[row]).unwrap();
 
-        // Update same timestamp
         let row2 = OHLCVRow {
             id: None,
             asset_id: asset_id.clone(),
@@ -201,7 +192,7 @@ mod tests {
             open: None,
             high: None,
             low: None,
-            close: Decimal::from_str("160.00").unwrap(),
+            close: 160.0,
             volume: None,
         };
         upsert_prices(&conn, &[row2]).unwrap();
@@ -216,8 +207,8 @@ mod tests {
         let asset_id = setup_asset(&conn);
 
         let rows = vec![
-            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700000000, open: None, high: None, low: None, close: Decimal::from_str("100.00").unwrap(), volume: None },
-            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700086400, open: None, high: None, low: None, close: Decimal::from_str("110.00").unwrap(), volume: None },
+            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700000000, open: None, high: None, low: None, close: 100.0, volume: None },
+            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700086400, open: None, high: None, low: None, close: 110.0, volume: None },
         ];
         upsert_prices(&conn, &rows).unwrap();
 
@@ -237,7 +228,6 @@ mod tests {
         assert_eq!(meta.provider, "twelve_data");
         assert_eq!(meta.last_fetched, 1700000000);
 
-        // Update
         update_cache_meta(&conn, &asset_id, "coingecko", 1700001000).unwrap();
         let meta = get_cache_meta(&conn, &asset_id).unwrap().unwrap();
         assert_eq!(meta.provider, "coingecko");
@@ -253,7 +243,7 @@ mod tests {
             asset_id: asset_id.clone(),
             ts: 1700000000 + i * 86400,
             open: None, high: None, low: None,
-            close: Decimal::from_str("100.00").unwrap(),
+            close: 100.0,
             volume: None,
         }).collect();
         upsert_prices(&conn, &rows).unwrap();

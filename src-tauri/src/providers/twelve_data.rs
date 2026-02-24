@@ -2,9 +2,7 @@ use crate::models::{DateRange, OHLCVRow};
 use crate::providers::MarketDataProvider;
 use async_trait::async_trait;
 use chrono::DateTime;
-use rust_decimal::Decimal;
 use serde::Deserialize;
-use std::str::FromStr;
 
 pub struct TwelveDataProvider {
     api_key: String,
@@ -15,7 +13,10 @@ impl TwelveDataProvider {
     pub fn new(api_key: String) -> Self {
         Self {
             api_key,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .user_agent("atlas/0.1")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 }
@@ -91,13 +92,13 @@ impl MarketDataProvider for TwelveDataProvider {
             let ts = parse_date_to_unix(&v.datetime)?;
             rows.push(OHLCVRow {
                 id: None,
-                asset_id: String::new(), // filled by caller
+                asset_id: String::new(),
                 ts,
-                open: Some(Decimal::from_str(&v.open)?),
-                high: Some(Decimal::from_str(&v.high)?),
-                low: Some(Decimal::from_str(&v.low)?),
-                close: Decimal::from_str(&v.close)?,
-                volume: v.volume.as_ref().and_then(|v| Decimal::from_str(v).ok()),
+                open: Some(v.open.parse::<f64>()?),
+                high: Some(v.high.parse::<f64>()?),
+                low: Some(v.low.parse::<f64>()?),
+                close: v.close.parse::<f64>()?,
+                volume: v.volume.as_ref().and_then(|v| v.parse::<f64>().ok()),
             });
         }
 
@@ -130,7 +131,6 @@ impl MarketDataProvider for TwelveDataProvider {
 }
 
 fn parse_date_to_unix(datetime: &str) -> anyhow::Result<i64> {
-    // Twelve Data returns "YYYY-MM-DD" for daily
     let dt = chrono::NaiveDate::parse_from_str(datetime, "%Y-%m-%d")
         .map_err(|e| anyhow::anyhow!("Failed to parse date '{}': {}", datetime, e))?;
     Ok(dt

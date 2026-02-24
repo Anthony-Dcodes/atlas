@@ -1,4 +1,3 @@
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -44,11 +43,11 @@ pub struct OHLCVRow {
     pub id: Option<i64>,
     pub asset_id: String,
     pub ts: i64,
-    pub open: Option<Decimal>,
-    pub high: Option<Decimal>,
-    pub low: Option<Decimal>,
-    pub close: Decimal,
-    pub volume: Option<Decimal>,
+    pub open: Option<f64>,
+    pub high: Option<f64>,
+    pub low: Option<f64>,
+    pub close: f64,
+    pub volume: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -53,6 +53,7 @@ pub async fn fetch_prices(
                 let api_key = state
                     .with_db(|conn| queries::settings::get_setting(conn, "twelve_data_api_key"))
                     .map_err(|e| e.to_string())?
+                    .filter(|k| !k.is_empty())
                     .ok_or_else(|| {
                         "Twelve Data API key not configured. Add it in Settings.".to_string()
                     })?;

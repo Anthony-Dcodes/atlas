@@ -44,6 +44,7 @@ pub fn unlock_db(path: &Path, passphrase: &str) -> anyhow::Result<Connection> {
     }
     let conn = open_db(path, passphrase)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    schema::run_migrations(&conn)?;
     Ok(conn)
 }
 
