@@ -5,15 +5,16 @@
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Desktop framework | Tauri 2 | Local-only, minimal footprint, Rust backend, no Electron overhead |
-| DB encryption | SQLCipher (tauri-plugin-sql sqlcipher feature) | Transparent file-level encryption, PRAGMA key flow |
-| API key storage | Tauri Stronghold | OS-native secure storage, keys never touch renderer |
-| Chart library | @tradingview/lightweight-charts v4 | Best-in-class financial charts, MIT license, performant |
+| DB encryption | SQLCipher via `rusqlite` with `bundled-sqlcipher` feature | Transparent file-level encryption, PRAGMA key flow |
+| API key storage | Encrypted DB settings table (Stronghold planned for Phase 2) | Keys stored in SQLCipher-encrypted DB, never exposed to renderer |
+| Chart library | `lightweight-charts` v4 | Best-in-class financial charts, MIT license, performant |
 | State management | Zustand v5 | Minimal, no boilerplate, works well with React 19 |
 | Async data fetching | TanStack Query v5 | Cache invalidation, background refetch, devtools |
 | UI base | shadcn/ui + Tailwind CSS v4 | Unstyled primitives, full control, Tailwind-native |
-| Error handling (Rust) | anyhow | ergonomic, context-chain, converts cleanly to String at boundary |
-| HTTP client | reqwest (TLS enabled) | Async, well-maintained, HTTPS enforced |
-| Key derivation | Argon2id | Memory-hard, resistant to brute-force on passphrase |
+| Error handling (Rust) | anyhow | Ergonomic, context-chain, converts cleanly to String at boundary |
+| HTTP client | reqwest (rustls-tls, no default features) | Async, well-maintained, HTTPS enforced |
+| Key derivation | Argon2id (argon2 crate) | Memory-hard, resistant to brute-force on passphrase |
+| Price data types | `f64` (not `rust_decimal`) | DB stores REAL, JSON serializes as number, no conversion overhead |
 
 ## Architectural Decisions
 
@@ -33,9 +34,17 @@
 **Decision:** Passphrase derived via Argon2id → used as PRAGMA key → held in memory for session only.
 **Rationale:** If the DB file is stolen, it cannot be decrypted without the passphrase.
 
-### Frontend never receives raw API keys
-**Decision:** API keys written to Stronghold from Settings UI, retrieved only in Rust commands.
-**Rationale:** Renderer process is a higher attack surface. Keys must not be serialisable to JS.
+### f64 over Decimal for price data
+**Decision:** Use `f64` for all OHLCV price fields instead of `rust_decimal::Decimal`.
+**Rationale:** DB stores REAL (f64 natively), serde serializes f64 as JSON numbers (Decimal serializes as strings with default serde). Eliminates unnecessary Decimal↔f64 conversions in every DB read/write. Financial precision is adequate for display-only portfolio tracking (no transaction math yet).
+
+### API keys in encrypted DB (not Stronghold yet)
+**Decision:** API keys stored in the `settings` table within the SQLCipher-encrypted DB.
+**Rationale:** Stronghold integration is deferred. Keys are still encrypted at rest since the entire DB is SQLCipher-encrypted. Keys are never sent to the renderer. This is acceptable for Phase 1; Stronghold adds defense-in-depth for Phase 2.
+
+### Migrations run on both create and unlock
+**Decision:** `unlock_db()` calls `run_migrations()` (idempotent `CREATE TABLE IF NOT EXISTS`).
+**Rationale:** Ensures existing users get schema updates when the app is upgraded. Without this, only `create_db()` ran migrations and existing DBs would never get new tables/columns.
 
 ### Phase gating
 **Decision:** Phase 1 must be complete and stable before Phase 2 work begins.

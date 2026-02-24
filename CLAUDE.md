@@ -20,7 +20,7 @@ cargo clippy         # lint
 cargo test           # unit tests (once test modules are added)
 ```
 
-> **Note:** Vitest and Rust test modules are not yet configured. Add vitest to devDependencies for frontend tests, and `#[cfg(test)]` modules in each Rust file as the implementation grows.
+> Vitest is configured for frontend tests. Rust has `#[cfg(test)]` modules in `db/`, `state.rs`, and query modules. Run `npx vitest run` for frontend, `cargo test` from `src-tauri/` for Rust.
 
 ## AI Guidance
 
@@ -37,7 +37,7 @@ cargo test           # unit tests (once test modules are added)
 * NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 * If you create any temporary new files, scripts, or helper files for iteration, clean up these files by removing them at the end of the task.
 * When you update or modify core context files, also update markdown documentation and memory bank
-* When asked to commit changes, exclude CLAUDE.md and CLAUDE-*.md referenced memory bank system files from any commits. Never delete these files.
+* When asked to commit changes, include CLAUDE.md and CLAUDE-*.md memory bank system files in commits. Never delete these files.
 
 <investigate_before_answering>
 Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
@@ -161,17 +161,32 @@ atlas/
 
 ## Current Implementation State
 
-This is a **pre-Phase 1 scaffold** — only the Tauri 2 + React 19 template boilerplate exists. No domain code has been implemented yet.
+**Phase 1 MVP — In Progress.** Core architecture is implemented and functional. Recent bug-fix pass completed.
 
-**What actually exists on disk:**
-- `src/App.tsx` — Tauri template greeting demo (to be replaced entirely)
-- `src-tauri/src/lib.rs` — single `greet` command (to be replaced)
+**Backend (Rust/Tauri) — Implemented:**
+- `src-tauri/src/lib.rs` — Tauri builder with all commands registered, AppState setup
+- `src-tauri/src/state.rs` — `AppState` (DB mutex, rate limit tracking)
+- `src-tauri/src/models.rs` — `Asset`, `OHLCVRow` (f64 fields), `PriceCacheMeta`, `DateRange`, `AssetType` enum
+- `src-tauri/src/commands/` — `auth`, `assets`, `prices`, `settings` command modules
+- `src-tauri/src/db/` — SQLCipher init/unlock with Argon2id key derivation, schema migrations, typed query modules
+- `src-tauri/src/providers/` — `MarketDataProvider` trait + `TwelveDataProvider`, `CoinGeckoProvider` implementations
+- 22 Rust unit tests passing (DB, queries, state, crypto)
 
-**The folder structure and architecture in this document is the target design**, not current reality. None of the following exist yet:
-- `src-tauri/src/commands/`, `db/`, `providers/`, `state.rs`, `models.rs`
-- `src/components/`, `stores/`, `hooks/`, `lib/`, `types/`, `pages/`
-- Missing frontend deps: Tailwind, shadcn/ui, Lightweight Charts, Zustand, TanStack Query
-- Missing Rust deps: tauri-plugin-sql (sqlcipher), tauri-plugin-stronghold, tokio, reqwest, chrono, anyhow
+**Frontend (React/TS) — Implemented:**
+- `src/App.tsx` — Screen routing: loading → passphrase setup/unlock → main app
+- `src/pages/` — `Dashboard`, `PassphraseSetup`, `PassphraseUnlock`, `Settings`
+- `src/components/` — `AppShell`, `Sidebar`, `Header`, `AssetCard`, `AssetDetail`, `AddAssetDialog`, `PortfolioChart`, `AssetChart`
+- `src/hooks/` — `useAssets`, `usePrices` (TanStack Query wrappers)
+- `src/stores/` — `assetsStore`, `navigationStore` (Zustand)
+- `src/lib/tauri/` — Typed invoke wrappers for `auth`, `assets`, `prices`, `settings`
+- `src/lib/utils/` — `formatCurrency`, `toChartData`, `dateHelpers` with tests
+- 19 frontend tests passing (Vitest)
+
+**Not yet implemented:**
+- Tauri Stronghold integration for API key storage (keys currently in encrypted DB settings table)
+- Alpha Vantage provider (`alpha_vantage.rs` not created)
+- CSP configuration in `tauri.conf.json`
+- E2E tests (Tauri WebDriver)
 
 ---
 
