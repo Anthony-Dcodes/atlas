@@ -13,6 +13,14 @@ export function toCandlestickData(rows: OHLCVRow[]): CandlestickData<UTCTimestam
     }));
 }
 
+export function hasRealOHLC(rows: OHLCVRow[]): boolean {
+  if (rows.length === 0) return false;
+  const withOHLC = rows.filter(
+    (r) => r.open !== null && r.high !== null && r.low !== null,
+  );
+  return withOHLC.length / rows.length >= 0.1;
+}
+
 export function toLineData(rows: OHLCVRow[]): LineData<UTCTimestamp>[] {
   return [...rows]
     .sort((a, b) => a.ts - b.ts)

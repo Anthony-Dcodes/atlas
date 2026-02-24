@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AssetChart } from "@/components/charts/AssetChart";
+import { AddTransactionDialog } from "@/components/portfolio/AddTransactionDialog";
+import { TransactionList } from "@/components/portfolio/TransactionList";
+import { HoldingSummary } from "@/components/portfolio/HoldingSummary";
 import { usePrices, useRefreshAsset } from "@/hooks/usePrices";
 import { useRemoveAsset } from "@/hooks/useAssets";
 import { useAssetsStore } from "@/stores/assetsStore";
@@ -117,6 +120,18 @@ export function AssetDetail({ asset }: Props) {
           No price data available. Try refreshing or check your API key in Settings.
         </p>
       )}
+
+      {latestPrice && (
+        <HoldingSummary assetId={asset.id} currentPrice={latestPrice.close} />
+      )}
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Transactions</h3>
+          <AddTransactionDialog assetId={asset.id} />
+        </div>
+        <TransactionList assetId={asset.id} />
+      </div>
     </div>
   );
 }

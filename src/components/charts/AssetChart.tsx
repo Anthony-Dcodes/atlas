@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createChart, type IChartApi, ColorType, CandlestickSeries, LineSeries } from "lightweight-charts";
-import { toCandlestickData, toLineData } from "@/lib/utils/toChartData";
+import { hasRealOHLC, toCandlestickData, toLineData } from "@/lib/utils/toChartData";
 import type { OHLCVRow } from "@/types";
 import { Button } from "@/components/ui/button";
 
@@ -14,7 +14,16 @@ type ChartType = "candlestick" | "line";
 export function AssetChart({ data, height = 400 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [chartType, setChartType] = useState<ChartType>("candlestick");
+  const canShowCandlestick = useMemo(() => hasRealOHLC(data), [data]);
+  const [chartType, setChartType] = useState<ChartType>(() =>
+    hasRealOHLC(data) ? "candlestick" : "line",
+  );
+
+  useEffect(() => {
+    if (!canShowCandlestick && chartType === "candlestick") {
+      setChartType("line");
+    }
+  }, [canShowCandlestick, chartType]);
 
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return;
@@ -81,13 +90,15 @@ export function AssetChart({ data, height = 400 }: Props) {
   return (
     <div>
       <div className="mb-2 flex gap-1">
-        <Button
-          variant={chartType === "candlestick" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setChartType("candlestick")}
-        >
-          Candlestick
-        </Button>
+        {canShowCandlestick && (
+          <Button
+            variant={chartType === "candlestick" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setChartType("candlestick")}
+          >
+            Candlestick
+          </Button>
+        )}
         <Button
           variant={chartType === "line" ? "default" : "ghost"}
           size="sm"

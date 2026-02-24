@@ -26,3 +26,25 @@ export interface PriceCacheMeta {
   provider: string;
   last_fetched: number;
 }
+
+export type TxType = "buy" | "sell";
+
+export interface Transaction {
+  id: string;
+  asset_id: string;
+  tx_type: TxType;
+  quantity: number;
+  price_usd: number;
+  ts: number;
+  notes: string | null;
+  created_at: number;
+  deleted_at: number | null;
+}
+
+export interface AssetHoldingSummary {
+  total_bought: number;
+  total_sold: number;
+  net_quantity: number;
+  total_cost_basis: number;
+  avg_cost_per_unit: number;
+}

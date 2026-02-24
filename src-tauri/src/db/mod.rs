@@ -120,11 +120,11 @@ mod tests {
         // Verify tables exist
         let count: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('assets', 'historical_prices', 'price_cache_meta', 'settings')",
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('assets', 'historical_prices', 'price_cache_meta', 'settings', 'transactions')",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(count, 4);
+        assert_eq!(count, 5);
     }
 }

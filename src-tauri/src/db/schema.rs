@@ -36,6 +36,18 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
             key           TEXT PRIMARY KEY,
             value         TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS transactions (
+            id          TEXT PRIMARY KEY,
+            asset_id    TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+            tx_type     TEXT NOT NULL CHECK(tx_type IN ('buy','sell')),
+            quantity    REAL NOT NULL,
+            price_usd   REAL NOT NULL,
+            ts          INTEGER NOT NULL,
+            notes       TEXT,
+            created_at  INTEGER NOT NULL,
+            deleted_at  INTEGER
+        );
         ",
     )?;
     Ok(())

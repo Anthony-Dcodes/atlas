@@ -36,6 +36,10 @@ pub fn run() {
             commands::settings::remove_api_key,
             commands::settings::get_setting,
             commands::settings::save_setting,
+            commands::transactions::add_transaction,
+            commands::transactions::list_transactions,
+            commands::transactions::delete_transaction,
+            commands::transactions::get_holding_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

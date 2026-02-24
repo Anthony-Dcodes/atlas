@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toCandlestickData, toLineData } from "../toChartData";
+import { hasRealOHLC, toCandlestickData, toLineData } from "../toChartData";
 import type { OHLCVRow } from "@/types";
 
 const mockRows: OHLCVRow[] = [
@@ -35,6 +35,24 @@ describe("toCandlestickData", () => {
       time: 1700000000,
       open: 100, high: 100, low: 100, close: 100,
     });
+  });
+});
+
+describe("hasRealOHLC", () => {
+  it("returns true for full OHLCV data", () => {
+    expect(hasRealOHLC(mockRows)).toBe(true);
+  });
+
+  it("returns false for all-null OHLC (crypto scenario)", () => {
+    const cryptoRows: OHLCVRow[] = [
+      { id: 1, asset_id: "a1", ts: 1700000000, open: null, high: null, low: null, close: 100, volume: null },
+      { id: 2, asset_id: "a1", ts: 1700086400, open: null, high: null, low: null, close: 105, volume: null },
+    ];
+    expect(hasRealOHLC(cryptoRows)).toBe(false);
+  });
+
+  it("returns false for empty array", () => {
+    expect(hasRealOHLC([])).toBe(false);
   });
 });
 

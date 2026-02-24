@@ -62,3 +62,49 @@ pub struct DateRange {
     pub from: i64,
     pub to: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TxType {
+    Buy,
+    Sell,
+}
+
+impl TxType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TxType::Buy => "buy",
+            TxType::Sell => "sell",
+        }
+    }
+
+    pub fn from_str(s: &str) -> anyhow::Result<Self> {
+        match s {
+            "buy" => Ok(TxType::Buy),
+            "sell" => Ok(TxType::Sell),
+            _ => anyhow::bail!("Invalid transaction type: {}", s),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub id: String,
+    pub asset_id: String,
+    pub tx_type: TxType,
+    pub quantity: f64,
+    pub price_usd: f64,
+    pub ts: i64,
+    pub notes: Option<String>,
+    pub created_at: i64,
+    pub deleted_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetHoldingSummary {
+    pub total_bought: f64,
+    pub total_sold: f64,
+    pub net_quantity: f64,
+    pub total_cost_basis: f64,
+    pub avg_cost_per_unit: f64,
+}
