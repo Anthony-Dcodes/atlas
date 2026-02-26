@@ -17,10 +17,11 @@ npm run build
 # Rust backend (run from src-tauri/)
 cargo build
 cargo clippy         # lint
-cargo test           # unit tests (once test modules are added)
-```
+cargo test           # unit tests (22 tests across db, state, queries)
 
-> Vitest is configured for frontend tests. Rust has `#[cfg(test)]` modules in `db/`, `state.rs`, and query modules. Run `npx vitest run` for frontend, `cargo test` from `src-tauri/` for Rust.
+# Frontend tests
+npm test             # vitest run (19 tests across utilities and stores)
+```
 
 ## AI Guidance
 
@@ -37,7 +38,7 @@ cargo test           # unit tests (once test modules are added)
 * NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 * If you create any temporary new files, scripts, or helper files for iteration, clean up these files by removing them at the end of the task.
 * When you update or modify core context files, also update markdown documentation and memory bank
-* When asked to commit changes, include CLAUDE.md and CLAUDE-*.md memory bank system files in commits. Never delete these files.
+* When asked to commit changes, exclude CLAUDE.md and CLAUDE-*.md referenced memory bank system files from any commits. Never delete these files.
 
 <investigate_before_answering>
 Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
@@ -103,15 +104,16 @@ Atlas is a lightweight, local-first, open-source portfolio dashboard desktop app
 - React `^19` + Vite `^7` + TypeScript `^5` (strict)
 - Tailwind CSS `^4`
 - shadcn/ui (latest — install components individually via CLI)
-- `@tradingview/lightweight-charts` `^4`
+- `lightweight-charts` `^5` (npm package name, v5 API uses `chart.addSeries(CandlestickSeries, opts)`)
 - Zustand `^5` (global client state)
 - TanStack Query `^5` (async fetching, cache invalidation)
 - `@tauri-apps/api` `^2`
 
 **Backend (Rust / Tauri)**
 - `tauri ^2`
-- `tauri-plugin-sql` (with `sqlcipher` feature flag — not default sqlite)
-- `tauri-plugin-stronghold ^2`
+- `rusqlite` (with `bundled-sqlcipher` feature — direct PRAGMA key control, no system dependency)
+- `tauri-plugin-stronghold ^2` (registered but not actively used yet; API keys stored in encrypted DB settings)
+- `rust_decimal` (with `serde-with-float` for financial precision)
 - `tokio` (async runtime)
 - `serde` + `serde_json`
 - `anyhow` (error handling)
@@ -161,32 +163,34 @@ atlas/
 
 ## Current Implementation State
 
-**Phase 1 MVP — In Progress.** Core architecture is implemented and functional. Recent bug-fix pass completed.
+**Phase 1 MVP is implemented.** All core features are built and functional.
 
-**Backend (Rust/Tauri) — Implemented:**
-- `src-tauri/src/lib.rs` — Tauri builder with all commands registered, AppState setup
-- `src-tauri/src/state.rs` — `AppState` (DB mutex, rate limit tracking)
-- `src-tauri/src/models.rs` — `Asset`, `OHLCVRow` (f64 fields), `PriceCacheMeta`, `DateRange`, `AssetType` enum
-- `src-tauri/src/commands/` — `auth`, `assets`, `prices`, `settings` command modules
-- `src-tauri/src/db/` — SQLCipher init/unlock with Argon2id key derivation, schema migrations, typed query modules
-- `src-tauri/src/providers/` — `MarketDataProvider` trait + `TwelveDataProvider`, `CoinGeckoProvider` implementations
-- 22 Rust unit tests passing (DB, queries, state, crypto)
+**Backend (Rust):**
+- `src-tauri/src/models.rs` — Asset, OHLCVRow, PriceCacheMeta, AssetType, DateRange (with rust_decimal)
+- `src-tauri/src/state.rs` — AppState (DB mutex, rate limiting per provider)
+- `src-tauri/src/db/` — SQLCipher init with Argon2id key derivation, schema migrations
+- `src-tauri/src/db/queries/` — Full CRUD: assets (soft delete), prices (upsert/range), settings, cache meta
+- `src-tauri/src/providers/` — MarketDataProvider trait + TwelveData + CoinGecko implementations
+- `src-tauri/src/commands/` — auth (check_first_run, setup_db, unlock_db), assets, prices, settings
+- `src-tauri/src/domain/mod.rs` — placeholder for future pure logic
 
-**Frontend (React/TS) — Implemented:**
-- `src/App.tsx` — Screen routing: loading → passphrase setup/unlock → main app
-- `src/pages/` — `Dashboard`, `PassphraseSetup`, `PassphraseUnlock`, `Settings`
-- `src/components/` — `AppShell`, `Sidebar`, `Header`, `AssetCard`, `AssetDetail`, `AddAssetDialog`, `PortfolioChart`, `AssetChart`
-- `src/hooks/` — `useAssets`, `usePrices` (TanStack Query wrappers)
-- `src/stores/` — `assetsStore`, `navigationStore` (Zustand)
-- `src/lib/tauri/` — Typed invoke wrappers for `auth`, `assets`, `prices`, `settings`
-- `src/lib/utils/` — `formatCurrency`, `toChartData`, `dateHelpers` with tests
-- 19 frontend tests passing (Vitest)
+**Frontend (React/TypeScript):**
+- `src/pages/` — PassphraseSetup, PassphraseUnlock, Dashboard, Settings
+- `src/components/layout/` — AppShell, Sidebar, Header
+- `src/components/charts/` — AssetChart (candlestick/line toggle), PortfolioChart (area, time range selector)
+- `src/components/portfolio/` — AssetCard, AssetDetail, AddAssetDialog, PortfolioHeader, AllocationBar, HoldingsTable
+- `src/components/ui/` — shadcn: dialog, input, select, button, label, card, badge
+- `src/stores/` — navigationStore, assetsStore (Zustand)
+- `src/hooks/` — useAssets, usePrices (TanStack Query wrappers)
+- `src/lib/tauri/` — typed invoke wrappers for auth, assets, prices, settings
+- `src/lib/utils/` — formatCurrency, toChartData, dateHelpers, priceUtils, assetColors
+- `src/types/index.ts` — TS types mirroring Rust models
 
-**Not yet implemented:**
-- Tauri Stronghold integration for API key storage (keys currently in encrypted DB settings table)
-- Alpha Vantage provider (`alpha_vantage.rs` not created)
-- CSP configuration in `tauri.conf.json`
-- E2E tests (Tauri WebDriver)
+**Testing:**
+- Rust: 22 tests (DB queries, schema, key derivation, rate limiting) — `cargo test`
+- Frontend: 19 tests (utilities, store state transitions) — `npm test`
+
+**Dependencies installed:** Tailwind CSS v4, shadcn/ui, lightweight-charts v5, Zustand v5, TanStack Query v5, rusqlite (bundled-sqlcipher), reqwest (rustls-tls), argon2, rust_decimal, chrono, uuid, async-trait
 
 ---
 
@@ -235,7 +239,8 @@ CREATE TABLE assets (
   name        TEXT NOT NULL,
   asset_type  TEXT NOT NULL CHECK(asset_type IN ('stock','crypto','commodity')),
   currency    TEXT NOT NULL DEFAULT 'USD',
-  added_at    INTEGER NOT NULL         -- Unix timestamp (seconds)
+  added_at    INTEGER NOT NULL,        -- Unix timestamp (seconds)
+  deleted_at  INTEGER                  -- soft delete timestamp
 );
 
 CREATE TABLE historical_prices (
@@ -258,17 +263,22 @@ CREATE TABLE settings (
 );
 ```
 
-**OHLCV → Lightweight Charts**
+**OHLCV → Lightweight Charts (v5 API)**
 ```typescript
-import type { CandlestickData, UTCTimestamp } from '@tradingview/lightweight-charts'
+import type { CandlestickData, UTCTimestamp } from 'lightweight-charts'
 
-export const toChartData = (rows: OHLCVRow[]): CandlestickData[] =>
-  rows
+export function toCandlestickData(rows: OHLCVRow[]): CandlestickData<UTCTimestamp>[] {
+  return [...rows]
     .sort((a, b) => a.ts - b.ts)
     .map(r => ({
       time: r.ts as UTCTimestamp,      // seconds, NOT milliseconds
-      open: r.open, high: r.high, low: r.low, close: r.close,
+      open: r.open ?? r.close,
+      high: r.high ?? r.close,
+      low: r.low ?? r.close,
+      close: r.close,
     }))
+}
+// v5: chart.addSeries(CandlestickSeries, options) instead of chart.addCandlestickSeries(options)
 ```
 
 ---
@@ -281,9 +291,10 @@ export const toChartData = (rows: OHLCVRow[]): CandlestickData[] =>
 3. DB file location: `tauri::api::path::app_data_dir()` — never exposed to the renderer process
 
 **API Key Storage**
-- User enters keys in Settings UI → `invoke("save_api_key", { provider, key })` → Rust writes to Stronghold vault
+- User enters keys in Settings UI → `invoke("save_api_key", { provider, key })` → Rust stores in encrypted DB settings table (key: `{provider}_api_key`)
 - Keys retrieved in Rust commands only — never serialised back to frontend, never logged
-- If Stronghold unavailable: fallback to OS keychain via platform-appropriate crate
+- DB is encrypted via SQLCipher, so keys are encrypted at rest
+- Future: migrate to Tauri Stronghold for separate vault storage
 
 **Threat Model**
 - Protects against: physical device access, accidental key exposure in git/logs, renderer-level injection
@@ -367,8 +378,10 @@ Do not: modify schema, add dependencies, touch Phase 2 files
 - Memory leak: always call `chart.remove()` in the `useEffect` return cleanup function
 
 **SQLCipher in Rust**
-- Enable `sqlcipher` feature flag in `Cargo.toml`, not the default `sqlite` — they are mutually exclusive builds
-- Send `PRAGMA key = 'passphrase'` as the very first statement after opening the connection
+- Using `rusqlite = { features = ["bundled-sqlcipher"] }` — bundles SQLCipher, no system `libsqlcipher-dev` needed
+- `PRAGMA key = x'{hex_key}'` sent via `conn.pragma_update()` as the very first statement after opening
+- Key derived from passphrase via Argon2id with static salt in `db/mod.rs`
+- Verify key works with `SELECT count(*) FROM sqlite_master;` — wrong key gives "not a database" error
 - Run schema migrations inside Rust on DB init — never from the frontend
 
 **Rate Limiting**

@@ -5,18 +5,29 @@
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Desktop framework | Tauri 2 | Local-only, minimal footprint, Rust backend, no Electron overhead |
-| DB encryption | SQLCipher via `rusqlite` with `bundled-sqlcipher` feature | Transparent file-level encryption, PRAGMA key flow |
-| API key storage | Encrypted DB settings table (Stronghold planned for Phase 2) | Keys stored in SQLCipher-encrypted DB, never exposed to renderer |
-| Chart library | `lightweight-charts` v4 | Best-in-class financial charts, MIT license, performant |
+| DB encryption | SQLCipher via `rusqlite` `bundled-sqlcipher` | Direct PRAGMA key control, bundles SQLCipher (no system dep), compile-time checked |
+| API key storage | Encrypted DB settings table (Phase 1) | Simpler than Stronghold for MVP; DB is SQLCipher-encrypted anyway |
+| Chart library | `lightweight-charts` v5 | Best-in-class financial charts, MIT license, performant |
 | State management | Zustand v5 | Minimal, no boilerplate, works well with React 19 |
 | Async data fetching | TanStack Query v5 | Cache invalidation, background refetch, devtools |
 | UI base | shadcn/ui + Tailwind CSS v4 | Unstyled primitives, full control, Tailwind-native |
 | Error handling (Rust) | anyhow | Ergonomic, context-chain, converts cleanly to String at boundary |
-| HTTP client | reqwest (rustls-tls, no default features) | Async, well-maintained, HTTPS enforced |
-| Key derivation | Argon2id (argon2 crate) | Memory-hard, resistant to brute-force on passphrase |
-| Price data types | `f64` (not `rust_decimal`) | DB stores REAL, JSON serializes as number, no conversion overhead |
+| HTTP client | reqwest (rustls-tls) | Async, no OpenSSL runtime dep, simpler on aarch64 |
+| Key derivation | Argon2id | Memory-hard, resistant to brute-force on passphrase |
+| Financial precision | rust_decimal (serde-with-float) | Exact arithmetic, serializes as JSON number |
+| TLS | rustls (not OpenSSL) | No system dependency, easier cross-compile |
+| Routing | State-based (Zustand store) | Only 3 pages, no router library needed |
+| Theme | Dark default | Financial app convention |
 
 ## Architectural Decisions
+
+### rusqlite instead of tauri-plugin-sql
+**Decision:** Use `rusqlite` with `bundled-sqlcipher` instead of `tauri-plugin-sql`.
+**Rationale:** Full control over PRAGMA key timing (must be first statement). Plugin abstracts away the connection lifecycle. Bundled SQLCipher means no system `libsqlcipher-dev` dependency.
+
+### API keys in encrypted DB (not Stronghold)
+**Decision:** Store API keys in the DB `settings` table as `{provider}_api_key`.
+**Rationale:** DB is already SQLCipher-encrypted. Stronghold adds complexity for Phase 1. Can migrate to Stronghold in Phase 2 for defense-in-depth.
 
 ### No backend server
 **Decision:** Everything runs locally. No cloud sync, no telemetry, no accounts.
@@ -28,28 +39,36 @@
 
 ### DB access through typed query functions only
 **Decision:** No inline SQL in commands. All queries in `db/queries/`.
-**Rationale:** Testability, compile-time checking, single source of truth for schema assumptions.
+**Rationale:** Testability, single source of truth for schema assumptions.
 
 ### Passphrase never stored
 **Decision:** Passphrase derived via Argon2id → used as PRAGMA key → held in memory for session only.
 **Rationale:** If the DB file is stolen, it cannot be decrypted without the passphrase.
 
-### f64 over Decimal for price data
-**Decision:** Use `f64` for all OHLCV price fields instead of `rust_decimal::Decimal`.
-**Rationale:** DB stores REAL (f64 natively), serde serializes f64 as JSON numbers (Decimal serializes as strings with default serde). Eliminates unnecessary Decimal↔f64 conversions in every DB read/write. Financial precision is adequate for display-only portfolio tracking (no transaction math yet).
-
-### API keys in encrypted DB (not Stronghold yet)
-**Decision:** API keys stored in the `settings` table within the SQLCipher-encrypted DB.
-**Rationale:** Stronghold integration is deferred. Keys are still encrypted at rest since the entire DB is SQLCipher-encrypted. Keys are never sent to the renderer. This is acceptable for Phase 1; Stronghold adds defense-in-depth for Phase 2.
-
-### Migrations run on both create and unlock
-**Decision:** `unlock_db()` calls `run_migrations()` (idempotent `CREATE TABLE IF NOT EXISTS`).
-**Rationale:** Ensures existing users get schema updates when the app is upgraded. Without this, only `create_db()` ran migrations and existing DBs would never get new tables/columns.
+### State-based routing (no router library)
+**Decision:** Use Zustand `navigationStore` with conditional rendering in `AppShell`.
+**Rationale:** Only 3 pages (Dashboard, Settings, and asset detail as sub-view). No URL-based navigation needed in a desktop app.
 
 ### Phase gating
 **Decision:** Phase 1 must be complete and stable before Phase 2 work begins.
 **Rationale:** Prevents scope creep and ensures the core (encryption, data fetch, display) is solid before adding analytics complexity.
 
 ## CSP Status
-**Current state:** CSP is `null` in `tauri.conf.json` (template default).
-**Required:** Set a strict CSP before Phase 1 is considered complete. `eval` must be disabled.
+**Implemented:** CSP set in `tauri.conf.json`:
+`default-src 'self'; connect-src https://api.twelvedata.com https://api.coingecko.com https://api.alphavantage.co ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'`
+
+## Incremental Price Fetching
+**Decision:** On stale cache, fetch only from the day after the last stored timestamp (`get_max_ts + 86400`) to today. Fall back to full 1-year range on first fetch (no data). `refresh_asset` clears both `historical_prices` and `price_cache_meta` to force a full re-download.
+**Rationale:** Avoids re-fetching the entire year of history on every hourly cache expiry. Saves API quota (critical for Twelve Data's 8 req/min free tier) and reduces response sizes. Full re-download is still available via manual refresh.
+
+## Dashboard Redesign — Binance-style Layout
+**Decision:** Replace the original card grid + `PortfolioSummary` with a three-section layout: (A) `PortfolioHeader` + `PortfolioChart`, (B) `AllocationBar`, (C) `HoldingsTable`.
+**Rationale:** Original had a critical React hooks-in-loop bug (`usePrices()` inside `for` loop in `PortfolioSummary`). Redesign fixes the bug via `useQueries`, adds data-dense Binance-inspired UI, and consolidates all derived portfolio math into a single `useMemo`. `AssetCard` grid removed in favour of the table.
+
+## useQueries for Multi-Asset Price Fetching
+**Decision:** Use `useQueries` from TanStack Query instead of calling `usePrices()` in a loop.
+**Rationale:** React rules of hooks forbid hooks inside loops. `useQueries` takes an array of query configs and returns an array of results — exactly one hook call regardless of asset count.
+
+## Lightweight Charts v5 Migration
+**Decision:** Use v5 API (`chart.addSeries(CandlestickSeries, opts)`) instead of deprecated v4 methods.
+**Rationale:** npm package `lightweight-charts` v5 removed `addCandlestickSeries()`, `addLineSeries()`, etc. Now uses generic `addSeries()` with type parameter.
