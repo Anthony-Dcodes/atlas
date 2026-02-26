@@ -77,6 +77,13 @@ pub fn get_latest_price(conn: &Connection, asset_id: &str) -> anyhow::Result<Opt
     }
 }
 
+pub fn get_max_ts(conn: &Connection, asset_id: &str) -> anyhow::Result<Option<i64>> {
+    let mut stmt =
+        conn.prepare("SELECT MAX(ts) FROM historical_prices WHERE asset_id = ?1")?;
+    let ts: Option<i64> = stmt.query_row(params![asset_id], |row| row.get(0))?;
+    Ok(ts)
+}
+
 pub fn get_cache_meta(conn: &Connection, asset_id: &str) -> anyhow::Result<Option<PriceCacheMeta>> {
     let mut stmt = conn.prepare(
         "SELECT asset_id, provider, last_fetched FROM price_cache_meta WHERE asset_id = ?1",
@@ -231,6 +238,25 @@ mod tests {
         update_cache_meta(&conn, &asset_id, "coingecko", 1700001000).unwrap();
         let meta = get_cache_meta(&conn, &asset_id).unwrap().unwrap();
         assert_eq!(meta.provider, "coingecko");
+    }
+
+    #[test]
+    fn test_get_max_ts() {
+        let conn = test_db();
+        let asset_id = setup_asset(&conn);
+
+        // No prices yet
+        assert!(get_max_ts(&conn, &asset_id).unwrap().is_none());
+
+        let rows = vec![
+            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700000000, open: None, high: None, low: None, close: 100.0, volume: None },
+            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700172800, open: None, high: None, low: None, close: 120.0, volume: None },
+            OHLCVRow { id: None, asset_id: asset_id.clone(), ts: 1700086400, open: None, high: None, low: None, close: 110.0, volume: None },
+        ];
+        upsert_prices(&conn, &rows).unwrap();
+
+        let max = get_max_ts(&conn, &asset_id).unwrap().unwrap();
+        assert_eq!(max, 1700172800);
     }
 
     #[test]

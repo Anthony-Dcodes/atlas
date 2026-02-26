@@ -32,9 +32,17 @@ pub async fn fetch_prices(
         .map_err(|e| e.to_string())?;
 
     if is_stale {
-        // Determine provider and fetch
+        // Incremental fetch: start from the day after the last stored price,
+        // or fall back to 1 year ago if no data exists yet.
+        let max_ts = state
+            .with_db(|conn| queries::prices::get_max_ts(conn, &asset_id))
+            .map_err(|e| e.to_string())?;
+
         let range = DateRange {
-            from: now - (365 * 86400), // 1 year
+            from: match max_ts {
+                Some(ts) => ts + 86400, // day after last stored price
+                None => now - (365 * 86400), // first fetch: 1 year
+            },
             to: now,
         };
 
@@ -105,11 +113,15 @@ pub async fn refresh_asset(
     asset_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<OHLCVRow>, String> {
-    // Clear cache meta to force refresh
+    // Clear cache meta and price history to force full re-download
     state
         .with_db(|conn| {
             conn.execute(
                 "DELETE FROM price_cache_meta WHERE asset_id = ?1",
+                rusqlite::params![asset_id],
+            )?;
+            conn.execute(
+                "DELETE FROM historical_prices WHERE asset_id = ?1",
                 rusqlite::params![asset_id],
             )?;
             Ok(())
