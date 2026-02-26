@@ -101,6 +101,15 @@ pub struct Transaction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolSearchResult {
+    pub symbol: String,
+    pub name: String,
+    pub asset_type: String,
+    pub provider: String,
+    pub exchange: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetHoldingSummary {
     pub total_bought: f64,
     pub total_sold: f64,

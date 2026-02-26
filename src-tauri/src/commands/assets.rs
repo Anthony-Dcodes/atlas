@@ -14,9 +14,22 @@ pub fn add_asset(
 
     state
         .with_db(|conn| {
-            // Check for duplicate symbol
+            // Check for active duplicate
             if let Some(_existing) = queries::assets::get_asset_by_symbol(conn, &symbol)? {
                 anyhow::bail!("Asset with symbol {} already exists", symbol.to_uppercase());
+            }
+            // Check for soft-deleted asset with same symbol — restore it
+            if let Some(deleted) =
+                queries::assets::get_asset_by_symbol_including_deleted(conn, &symbol)?
+            {
+                if deleted.deleted_at.is_some() {
+                    return queries::assets::restore_asset(
+                        conn,
+                        &deleted.id,
+                        &name,
+                        &asset_type,
+                    );
+                }
             }
             queries::assets::insert_asset(conn, &symbol, &name, &asset_type, "USD")
         })

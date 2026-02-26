@@ -1,4 +1,4 @@
-use crate::models::{DateRange, OHLCVRow};
+use crate::models::{DateRange, OHLCVRow, SymbolSearchResult};
 use crate::providers::MarketDataProvider;
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -52,27 +52,36 @@ impl MarketDataProvider for TwelveDataProvider {
     }
 
     async fn fetch_ohlcv(&self, symbol: &str, range: &DateRange) -> anyhow::Result<Vec<OHLCVRow>> {
-        let start = DateTime::from_timestamp(range.from, 0)
-            .ok_or_else(|| anyhow::anyhow!("Invalid start timestamp"))?
-            .format("%Y-%m-%d")
-            .to_string();
         let end = DateTime::from_timestamp(range.to, 0)
             .ok_or_else(|| anyhow::anyhow!("Invalid end timestamp"))?
             .format("%Y-%m-%d")
             .to_string();
 
+        // On first fetch (from=0), omit start_date and rely on outputsize=5000
+        // to get max available history (~20 years of daily data)
+        let is_first_fetch = range.from == 0;
+
+        let mut params = vec![
+            ("symbol", symbol.to_string()),
+            ("interval", "1day".to_string()),
+            ("end_date", end),
+            ("apikey", self.api_key.clone()),
+            ("format", "JSON".to_string()),
+            ("outputsize", "5000".to_string()),
+        ];
+
+        if !is_first_fetch {
+            let start = DateTime::from_timestamp(range.from, 0)
+                .ok_or_else(|| anyhow::anyhow!("Invalid start timestamp"))?
+                .format("%Y-%m-%d")
+                .to_string();
+            params.push(("start_date", start));
+        }
+
         let resp: TimeSeriesResponse = self
             .client
             .get("https://api.twelvedata.com/time_series")
-            .query(&[
-                ("symbol", symbol),
-                ("interval", "1day"),
-                ("start_date", &start),
-                ("end_date", &end),
-                ("apikey", &self.api_key),
-                ("format", "JSON"),
-                ("outputsize", "5000"),
-            ])
+            .query(&params)
             .send()
             .await?
             .json()
@@ -127,6 +136,62 @@ impl MarketDataProvider for TwelveDataProvider {
             .ok_or_else(|| anyhow::anyhow!("No price returned"))?
             .parse::<f64>()
             .map_err(|e| anyhow::anyhow!("Failed to parse price: {}", e))
+    }
+
+    async fn search_symbols(&self, query: &str) -> anyhow::Result<Vec<SymbolSearchResult>> {
+        let resp: SymbolSearchResponse = self
+            .client
+            .get("https://api.twelvedata.com/symbol_search")
+            .query(&[("symbol", query), ("outputsize", "10")])
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        let items = resp.data.unwrap_or_default();
+        let results = items
+            .into_iter()
+            .filter(|item| {
+                // Filter to US stocks and major exchanges for relevance
+                item.country.as_deref() == Some("United States")
+                    || item.instrument_type == "Digital Currency"
+                    || item.instrument_type == "Commodity"
+            })
+            .take(8)
+            .map(|item| SymbolSearchResult {
+                symbol: item.symbol,
+                name: item.instrument_name,
+                asset_type: map_instrument_type(&item.instrument_type).to_string(),
+                provider: "TwelveData".to_string(),
+                exchange: Some(item.exchange),
+            })
+            .collect();
+
+        Ok(results)
+    }
+}
+
+#[derive(Deserialize)]
+struct SymbolSearchResponse {
+    data: Option<Vec<SymbolSearchItem>>,
+}
+
+#[derive(Deserialize)]
+struct SymbolSearchItem {
+    symbol: String,
+    instrument_name: String,
+    instrument_type: String,
+    exchange: String,
+    country: Option<String>,
+}
+
+fn map_instrument_type(t: &str) -> &str {
+    match t {
+        "Common Stock" | "Equity" => "stock",
+        "ETF" | "Exchange Traded Fund" => "stock",
+        "Physical Currency" | "Digital Currency" => "crypto",
+        "Commodity" | "Mutual Fund" => "commodity",
+        _ => "stock",
     }
 }
 

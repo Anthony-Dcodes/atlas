@@ -41,7 +41,10 @@ pub async fn fetch_prices(
         let range = DateRange {
             from: match max_ts {
                 Some(ts) => ts + 86400, // day after last stored price
-                None => now - (365 * 86400), // first fetch: 1 year
+                None => match asset.asset_type {
+                    AssetType::Crypto => 946684800, // 2000-01-01: CoinGecko returns what exists
+                    _ => 0, // TwelveData: will use outputsize=5000 for max history
+                },
             },
             to: now,
         };

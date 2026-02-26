@@ -91,6 +91,45 @@ pub fn get_asset_by_symbol(conn: &Connection, symbol: &str) -> anyhow::Result<Op
     }
 }
 
+pub fn get_asset_by_symbol_including_deleted(
+    conn: &Connection,
+    symbol: &str,
+) -> anyhow::Result<Option<Asset>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, symbol, name, asset_type, currency, added_at, deleted_at FROM assets WHERE symbol = ?1",
+    )?;
+    let mut rows = stmt.query_map(params![symbol.to_uppercase()], |row| {
+        Ok(Asset {
+            id: row.get(0)?,
+            symbol: row.get(1)?,
+            name: row.get(2)?,
+            asset_type: AssetType::from_str(&row.get::<_, String>(3)?).unwrap_or(AssetType::Stock),
+            currency: row.get(4)?,
+            added_at: row.get(5)?,
+            deleted_at: row.get(6)?,
+        })
+    })?;
+    match rows.next() {
+        Some(row) => Ok(Some(row?)),
+        None => Ok(None),
+    }
+}
+
+pub fn restore_asset(
+    conn: &Connection,
+    id: &str,
+    name: &str,
+    asset_type: &AssetType,
+) -> anyhow::Result<Asset> {
+    let now = Utc::now().timestamp();
+    conn.execute(
+        "UPDATE assets SET deleted_at = NULL, name = ?1, asset_type = ?2, added_at = ?3 WHERE id = ?4",
+        params![name, asset_type.as_str(), now, id],
+    )?;
+    get_asset(conn, id)?
+        .ok_or_else(|| anyhow::anyhow!("Failed to restore asset"))
+}
+
 pub fn soft_delete_asset(conn: &Connection, id: &str) -> anyhow::Result<()> {
     let now = Utc::now().timestamp();
     let updated = conn.execute(
@@ -167,6 +206,33 @@ mod tests {
         // Should not be found by ID
         let found = get_asset(&conn, &asset.id).unwrap();
         assert!(found.is_none());
+    }
+
+    #[test]
+    fn test_restore_soft_deleted_asset() {
+        let conn = test_db();
+        let asset = insert_asset(&conn, "TSLA", "Tesla", &AssetType::Stock, "USD").unwrap();
+        soft_delete_asset(&conn, &asset.id).unwrap();
+
+        // Should not appear in active queries
+        assert!(get_asset_by_symbol(&conn, "TSLA").unwrap().is_none());
+
+        // Should appear when including deleted
+        let deleted = get_asset_by_symbol_including_deleted(&conn, "TSLA").unwrap();
+        assert!(deleted.is_some());
+        assert!(deleted.unwrap().deleted_at.is_some());
+
+        // Restore it
+        let restored = restore_asset(&conn, &asset.id, "Tesla Inc.", &AssetType::Stock).unwrap();
+        assert!(restored.deleted_at.is_none());
+        assert_eq!(restored.name, "Tesla Inc.");
+
+        // Should now appear in active queries
+        let found = get_asset_by_symbol(&conn, "TSLA").unwrap();
+        assert!(found.is_some());
+
+        let assets = list_assets(&conn).unwrap();
+        assert_eq!(assets.len(), 1);
     }
 
     #[test]

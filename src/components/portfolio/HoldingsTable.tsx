@@ -12,6 +12,8 @@ export interface HoldingRow {
   assetValue: number | null;
   unrealizedPnL: number | null;
   pnlPct: number | null;
+  priceLoading: boolean;
+  priceError: boolean;
 }
 
 interface Props {
@@ -77,6 +79,10 @@ export function HoldingsTable({ rows, onSelect }: Props) {
               <td className="px-6 py-4 text-right tabular-nums text-zinc-100">
                 {row.latestPrice !== null ? (
                   formatCurrency(row.latestPrice)
+                ) : row.priceLoading ? (
+                  <span className="text-zinc-500 animate-pulse">Loading…</span>
+                ) : row.priceError ? (
+                  <span className="text-amber-400" title="Price fetch failed">Error</span>
                 ) : (
                   <span className="text-zinc-500">—</span>
                 )}

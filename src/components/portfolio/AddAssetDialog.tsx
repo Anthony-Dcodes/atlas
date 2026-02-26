@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,12 +17,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAddAsset } from "@/hooks/useAssets";
+import { useSymbolSearch } from "@/hooks/useSymbolSearch";
 import { addTransaction } from "@/lib/tauri/transactions";
-import type { AssetType } from "@/types";
-import { Plus } from "lucide-react";
+import type { AssetType, SymbolSearchResult } from "@/types";
+import { Plus, Search } from "lucide-react";
+
+const providerBadgeClass: Record<string, string> = {
+  TwelveData: "border-blue-500/40 bg-blue-500/10 text-blue-400",
+  CoinGecko: "border-violet-500/40 bg-violet-500/10 text-violet-400",
+};
+
+const typeBadgeClass: Record<string, string> = {
+  stock: "text-blue-400",
+  crypto: "text-violet-400",
+  commodity: "text-amber-400",
+};
 
 export function AddAssetDialog() {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showResults, setShowResults] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [assetType, setAssetType] = useState<AssetType>("stock");
@@ -31,8 +45,12 @@ export function AddAssetDialog() {
   const [purchasePrice, setPurchasePrice] = useState("");
   const [error, setError] = useState("");
   const addAsset = useAddAsset();
+  const { data: searchResults, isLoading: isSearching } = useSymbolSearch(searchQuery);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   function reset() {
+    setSearchQuery("");
+    setShowResults(false);
     setSymbol("");
     setName("");
     setAssetType("stock");
@@ -40,6 +58,17 @@ export function AddAssetDialog() {
     setPurchaseQty("");
     setPurchasePrice("");
     setError("");
+  }
+
+  function handleSelectResult(result: SymbolSearchResult) {
+    setSymbol(result.symbol);
+    setName(result.name);
+    const mapped = result.asset_type as AssetType;
+    if (mapped === "stock" || mapped === "crypto" || mapped === "commodity") {
+      setAssetType(mapped);
+    }
+    setShowResults(false);
+    setSearchQuery("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -57,7 +86,6 @@ export function AddAssetDialog() {
 
     const hasQty = purchaseQty !== "";
     const hasPrice = purchasePrice !== "";
-    // date is pre-filled; use qty/price to detect if the user intends to record a purchase
     const hasAny = hasQty || hasPrice;
     const hasAll = purchaseDate !== "" && hasQty && hasPrice;
 
@@ -107,6 +135,59 @@ export function AddAssetDialog() {
           <DialogTitle>Add Asset</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Search input */}
+          <div className="relative" ref={searchRef}>
+            <Label htmlFor="search">Search ticker</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="search"
+                className="pl-9"
+                placeholder="Search e.g. AAPL, Bitcoin, Tesla..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowResults(true);
+                }}
+                onFocus={() => { if (searchQuery.trim()) setShowResults(true); }}
+                autoFocus
+                autoComplete="off"
+              />
+            </div>
+            {showResults && searchQuery.trim().length >= 1 && (
+              <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
+                {isSearching && (
+                  <div className="px-4 py-3 text-sm text-muted-foreground animate-pulse">Searching...</div>
+                )}
+                {!isSearching && searchResults && searchResults.length === 0 && (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">No results found. You can still fill in fields manually.</div>
+                )}
+                {!isSearching && searchResults && searchResults.map((result, i) => (
+                  <button
+                    key={`${result.provider}-${result.symbol}-${i}`}
+                    type="button"
+                    className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-zinc-800"
+                    onClick={() => handleSelectResult(result)}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-zinc-100">{result.symbol}</span>
+                      <span className="truncate text-sm text-zinc-400">{result.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <span className={`text-xs ${typeBadgeClass[result.asset_type] ?? "text-zinc-400"}`}>
+                        {result.asset_type}
+                      </span>
+                      <span className={`rounded border px-1.5 py-0.5 text-xs ${providerBadgeClass[result.provider] ?? ""}`}>
+                        {result.provider}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Symbol / Name / Type fields */}
           <div className="space-y-2">
             <Label htmlFor="symbol">Symbol</Label>
             <Input
@@ -114,7 +195,6 @@ export function AddAssetDialog() {
               placeholder="e.g. AAPL, BTC, GOLD"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
-              autoFocus
             />
           </div>
           <div className="space-y-2">

@@ -40,6 +40,7 @@ pub fn run() {
             commands::transactions::list_transactions,
             commands::transactions::delete_transaction,
             commands::transactions::get_holding_summary,
+            commands::search::search_symbols,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

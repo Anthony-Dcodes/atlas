@@ -80,37 +80,41 @@ export function Dashboard() {
     const totalPnLPct =
       totalCostBasis > 0 ? (totalUnrealizedPnL / totalCostBasis) * 100 : 0;
 
-    const holdingRows = assetPrices.flatMap(({ asset, sorted, latestPrice, holding, isHeld }) => {
-      if (latestPrice === null) return [];
-
+    const holdingRows = assetPrices.map(({ asset, sorted, latestPrice, holding, isHeld }, i) => {
       let netQty = 0;
       let assetValue: number | null = null;
       let unrealizedPnL: number | null = null;
       let pnlPct: number | null = null;
 
-      if (isHeld && holding) {
+      if (isHeld && holding && latestPrice !== null) {
         netQty = holding.net_quantity;
         assetValue = holding.net_quantity * latestPrice;
         unrealizedPnL = assetValue - holding.total_cost_basis + (holding.total_sold * holding.avg_cost_per_unit);
         pnlPct = holding.total_cost_basis > 0
           ? (unrealizedPnL / holding.total_cost_basis) * 100
           : 0;
+      } else if (isHeld && holding) {
+        netQty = holding.net_quantity;
       }
 
-      return [
-        {
-          asset,
-          latestPrice,
-          change24h: calcChange(sorted, 1),
-          allocationPct: isHeld && totalValue > 0 ? ((assetValue ?? 0) / totalValue) * 100 : 0,
-          color: colorMap.get(asset.id) ?? "#71717a",
-          isHeld,
-          netQty,
-          assetValue,
-          unrealizedPnL,
-          pnlPct,
-        },
-      ];
+      const priceQuery = priceResults[i];
+      const priceLoading = priceQuery?.isLoading ?? false;
+      const priceError = priceQuery?.isError ?? false;
+
+      return {
+        asset,
+        latestPrice,
+        change24h: sorted.length > 0 ? calcChange(sorted, 1) : null,
+        allocationPct: isHeld && totalValue > 0 ? ((assetValue ?? 0) / totalValue) * 100 : 0,
+        color: colorMap.get(asset.id) ?? "#71717a",
+        isHeld,
+        netQty,
+        assetValue,
+        unrealizedPnL,
+        pnlPct,
+        priceLoading,
+        priceError,
+      };
     });
 
     // Sort: held assets first (by value DESC), then tracked (by name)

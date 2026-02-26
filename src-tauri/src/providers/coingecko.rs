@@ -1,4 +1,4 @@
-use crate::models::{DateRange, OHLCVRow};
+use crate::models::{DateRange, OHLCVRow, SymbolSearchResult};
 use crate::providers::MarketDataProvider;
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -43,6 +43,17 @@ pub fn ticker_to_coin_id(ticker: &str) -> String {
 #[derive(Deserialize)]
 struct MarketChartResponse {
     prices: Vec<[f64; 2]>,
+}
+
+#[derive(Deserialize)]
+struct CoinSearchResponse {
+    coins: Vec<CoinSearchItem>,
+}
+
+#[derive(Deserialize)]
+struct CoinSearchItem {
+    symbol: String,
+    name: String,
 }
 
 #[derive(Deserialize)]
@@ -123,5 +134,31 @@ impl MarketDataProvider for CoinGeckoProvider {
             .get(&coin_id)
             .and_then(|p| p.usd)
             .ok_or_else(|| anyhow::anyhow!("No price found for {}", symbol))
+    }
+
+    async fn search_symbols(&self, query: &str) -> anyhow::Result<Vec<SymbolSearchResult>> {
+        let resp: CoinSearchResponse = self
+            .client
+            .get("https://api.coingecko.com/api/v3/search")
+            .query(&[("query", query)])
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        let results = resp
+            .coins
+            .into_iter()
+            .take(5)
+            .map(|coin| SymbolSearchResult {
+                symbol: coin.symbol.to_uppercase(),
+                name: coin.name,
+                asset_type: "crypto".to_string(),
+                provider: "CoinGecko".to_string(),
+                exchange: None,
+            })
+            .collect();
+
+        Ok(results)
     }
 }

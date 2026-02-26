@@ -41,6 +41,14 @@ export interface Transaction {
   deleted_at: number | null;
 }
 
+export interface SymbolSearchResult {
+  symbol: string;
+  name: string;
+  asset_type: string;
+  provider: string;
+  exchange: string | null;
+}
+
 export interface AssetHoldingSummary {
   total_bought: number;
   total_sold: number;
