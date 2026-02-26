@@ -135,10 +135,17 @@ export function Dashboard() {
         color: row.color,
       }));
 
+    const holdings = new Map<string, number>();
+    for (const ap of assetPrices) {
+      if (ap.isHeld && ap.holding) {
+        holdings.set(ap.asset.id, ap.holding.net_quantity);
+      }
+    }
+
     return {
       totalValue, change24hValue, change24hPct,
       totalUnrealizedPnL, totalPnLPct,
-      allPrices, holdingRows, segments,
+      allPrices, holdings, holdingRows, segments,
     };
   }, [assets, priceResults, holdingResults]);
 
@@ -175,7 +182,7 @@ export function Dashboard() {
               totalUnrealizedPnL={derived.totalUnrealizedPnL}
               totalPnLPct={derived.totalPnLPct}
             />
-            <PortfolioChart allPrices={derived.allPrices} height={260} />
+            <PortfolioChart allPrices={derived.allPrices} holdings={derived.holdings} height={260} />
           </div>
 
           {/* Section B: Allocation bar */}

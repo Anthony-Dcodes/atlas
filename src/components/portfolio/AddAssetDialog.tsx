@@ -174,6 +174,9 @@ export function AddAssetDialog() {
                       <span className="truncate text-sm text-zinc-400">{result.name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
+                      {result.exchange && (
+                        <span className="text-xs text-zinc-500">{result.exchange}</span>
+                      )}
                       <span className={`text-xs ${typeBadgeClass[result.asset_type] ?? "text-zinc-400"}`}>
                         {result.asset_type}
                       </span>

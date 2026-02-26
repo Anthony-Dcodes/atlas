@@ -19,7 +19,7 @@ import {
 import { useAddTransaction, useUpdateTransaction } from "@/hooks/useTransactions";
 import { useAssets } from "@/hooks/useAssets";
 import type { Transaction, TxType } from "@/types";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 interface Props {
   assetId?: string;
@@ -41,8 +41,10 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
 
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [txType, setTxType] = useState<TxType>(transaction?.tx_type ?? "buy");
+  const [inputMode, setInputMode] = useState<"quantity" | "total">("quantity");
   const [quantity, setQuantity] = useState(transaction ? String(transaction.quantity) : "");
   const [priceUsd, setPriceUsd] = useState(transaction ? String(transaction.price_usd) : "");
+  const [totalAmount, setTotalAmount] = useState("");
   const [date, setDate] = useState(transaction ? tsToDateStr(transaction.ts) : () => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState(transaction?.notes ?? "");
   const [error, setError] = useState("");
@@ -54,8 +56,10 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
     if (isEdit) return;
     setSelectedAssetId("");
     setTxType("buy");
+    setInputMode("quantity");
     setQuantity("");
     setPriceUsd("");
+    setTotalAmount("");
     setDate(new Date().toISOString().slice(0, 10));
     setNotes("");
     setError("");
@@ -70,15 +74,30 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
       return;
     }
 
-    const qty = parseFloat(quantity);
     const price = parseFloat(priceUsd);
-
-    if (isNaN(qty) || qty <= 0) {
-      setError("Quantity must be a positive number");
-      return;
-    }
     if (isNaN(price) || price <= 0) {
       setError("Price must be a positive number");
+      return;
+    }
+
+    let qty: number;
+    if (inputMode === "total") {
+      const total = parseFloat(totalAmount);
+      if (isNaN(total) || total <= 0) {
+        setError("Total amount must be a positive number");
+        return;
+      }
+      qty = total / price;
+    } else {
+      qty = parseFloat(quantity);
+      if (isNaN(qty) || qty <= 0) {
+        setError("Quantity must be a positive number");
+        return;
+      }
+    }
+
+    if (!isFinite(qty) || qty <= 0) {
+      setError("Computed quantity is invalid");
       return;
     }
     if (!date) {
@@ -160,30 +179,87 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              type="number"
-              step="any"
-              min="0"
-              placeholder="e.g. 0.5"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
+          <div className="flex rounded-md bg-zinc-800 p-0.5">
+            <button
+              type="button"
+              className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "quantity" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+              onClick={() => setInputMode("quantity")}
+            >
+              By Quantity
+            </button>
+            <button
+              type="button"
+              className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "total" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+              onClick={() => setInputMode("total")}
+            >
+              By Total
+            </button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="priceUsd">Price (USD)</Label>
-            <Input
-              id="priceUsd"
-              type="number"
-              step="any"
-              min="0"
-              placeholder="e.g. 50000"
-              value={priceUsd}
-              onChange={(e) => setPriceUsd(e.target.value)}
-            />
-          </div>
+          {inputMode === "quantity" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 0.5"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="priceUsd">Price per unit (USD)</Label>
+                <Input
+                  id="priceUsd"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 50000"
+                  value={priceUsd}
+                  onChange={(e) => setPriceUsd(e.target.value)}
+                />
+              </div>
+              {quantity && priceUsd && parseFloat(quantity) > 0 && parseFloat(priceUsd) > 0 && (
+                <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
+                  Total: <span className="text-zinc-200">${(parseFloat(quantity) * parseFloat(priceUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="totalAmount">Total Amount (USD)</Label>
+                <Input
+                  id="totalAmount"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 1000"
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="priceUsd">Price per unit (USD)</Label>
+                <Input
+                  id="priceUsd"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 50000"
+                  value={priceUsd}
+                  onChange={(e) => setPriceUsd(e.target.value)}
+                />
+              </div>
+              {totalAmount && priceUsd && parseFloat(totalAmount) > 0 && parseFloat(priceUsd) > 0 && (
+                <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
+                  Quantity: <span className="text-zinc-200">{(parseFloat(totalAmount) / parseFloat(priceUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                </div>
+              )}
+            </>
+          )}
           <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
             <Input

@@ -7,6 +7,7 @@ import type { UTCTimestamp, AreaData } from "lightweight-charts";
 
 interface Props {
   allPrices: Map<string, OHLCVRow[]>;
+  holdings: Map<string, number>;
   height?: number;
 }
 
@@ -30,7 +31,7 @@ function getRangeStart(range: TimeRange): number {
   }
 }
 
-export function PortfolioChart({ allPrices, height = 300 }: Props) {
+export function PortfolioChart({ allPrices, holdings, height = 300 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
@@ -63,10 +64,12 @@ export function PortfolioChart({ allPrices, height = 300 }: Props) {
     const rangeStart = getRangeStart(timeRange);
     const priceMap = new Map<number, number>();
 
-    for (const rows of allPrices.values()) {
+    for (const [assetId, rows] of allPrices.entries()) {
+      const qty = holdings.get(assetId);
+      if (qty === undefined || qty <= 0) continue;
       for (const row of rows) {
         if (row.ts >= rangeStart) {
-          priceMap.set(row.ts, (priceMap.get(row.ts) ?? 0) + row.close);
+          priceMap.set(row.ts, (priceMap.get(row.ts) ?? 0) + qty * row.close);
         }
       }
     }
@@ -102,7 +105,7 @@ export function PortfolioChart({ allPrices, height = 300 }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [allPrices, height, timeRange]);
+  }, [allPrices, holdings, height, timeRange]);
 
   return (
     <div>
