@@ -4,10 +4,19 @@ interface Props {
   totalValue: number;
   change24hValue: number;
   change24hPct: number;
+  totalUnrealizedPnL: number;
+  totalPnLPct: number;
 }
 
-export function PortfolioHeader({ totalValue, change24hValue, change24hPct }: Props) {
+export function PortfolioHeader({
+  totalValue,
+  change24hValue,
+  change24hPct,
+  totalUnrealizedPnL,
+  totalPnLPct,
+}: Props) {
   const isPositive = change24hValue >= 0;
+  const isPnLPositive = totalUnrealizedPnL >= 0;
 
   return (
     <div>
@@ -30,6 +39,22 @@ export function PortfolioHeader({ totalValue, change24hValue, change24hPct }: Pr
           <span>{formatPercent(change24hPct)}</span>
           <span className="text-xs font-normal opacity-70">24h</span>
         </div>
+        {totalValue > 0 && (
+          <div
+            className={`mb-1 flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium ${
+              isPnLPositive
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-red-500/10 text-red-400"
+            }`}
+          >
+            <span>
+              {isPnLPositive ? "+" : ""}
+              {formatCurrency(totalUnrealizedPnL)}
+            </span>
+            <span>{formatPercent(totalPnLPct)}</span>
+            <span className="text-xs font-normal opacity-70">P&L</span>
+          </div>
+        )}
       </div>
     </div>
   );

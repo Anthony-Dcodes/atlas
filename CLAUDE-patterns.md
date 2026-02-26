@@ -187,43 +187,21 @@ const priceResults = useQueries({
 
 **Never** use a hook inside a loop (`for (const id of ids) { usePrices(id) }`) — React rules violation.
 
-## Dashboard Derived Data Pattern
+## Dashboard Derived Data Pattern (Holdings-Aware)
 
-Aggregate all price results into portfolio-level metrics via `useMemo`:
+Dashboard uses two `useQueries` calls: one for prices, one for holding summaries. The `useMemo` aggregates both into portfolio-level metrics:
 
-```typescript
-const derived = useMemo(() => {
-  if (!assets || assets.length === 0) return null;
-  const colorMap = buildColorMap(assets);
-  const allPrices = new Map<string, OHLCVRow[]>();
-  let totalValue = 0;
-  let totalValue24hAgo = 0;
+- **Portfolio value** = `Σ(net_quantity × latestPrice)` for held assets only (not 1-unit-per-asset)
+- **24h change** = portfolio value now vs portfolio value 24h ago (using `net_quantity × price24hAgo`)
+- **Unrealized P&L** = `Σ(currentValue - cost_basis + total_sold × avg_cost)` — same formula as `HoldingSummary.tsx`
+- **Held vs Tracked**: `isHeld = holding.total_bought > 0`. Tracked assets (no transactions) appear dimmed with dashes in Holdings/Value/P&L columns
+- **Sorting**: held assets first (by value DESC), then tracked (by name)
+- **AllocationBar segments**: filtered to held assets only (percentages sum to 100%)
+- Dependency array: `[assets, priceResults, holdingResults]`
 
-  const assetPrices = assets.map((asset, i) => {
-    const data = priceResults[i]?.data ?? [];
-    const sorted = [...data].sort((a, b) => a.ts - b.ts);
-    const latestPrice = sorted.length > 0 ? sorted[sorted.length - 1]!.close : null;
-    if (latestPrice !== null) {
-      totalValue += latestPrice;
-      allPrices.set(asset.id, sorted);
-      const historicalRow = sorted.filter((p) => p.ts <= daysAgo(1)).pop();
-      totalValue24hAgo += historicalRow ? historicalRow.close : latestPrice;
-    }
-    return { asset, sorted, latestPrice };
-  });
-
-  // flatMap for type-safe filter+map (null exclusion)
-  const holdingRows = assetPrices.flatMap(({ asset, sorted, latestPrice }) => {
-    if (latestPrice === null) return [];
-    return [{ asset, latestPrice, change24h: calcChange(sorted, 1), allocationPct: ..., color: ... }];
-  });
-
-  return { totalValue, change24hValue, change24hPct, allPrices, holdingRows, segments };
-}, [assets, priceResults]);
-```
-
+Key patterns:
 - `flatMap` with empty-array return is the idiomatic pattern for type-safe filter+map when narrowing `T | null → T`
-- `priceResults[i]?.data ?? []` handles both `noUncheckedIndexedAccess` and loading state
+- `priceResults[i]?.data ?? []` and `holdingResults[i]?.data ?? null` handle both `noUncheckedIndexedAccess` and loading state
 
 ## assetColors Pattern
 

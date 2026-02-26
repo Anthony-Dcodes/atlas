@@ -6,8 +6,9 @@
 ## Current State
 - Full Phase 1 MVP built: auth flow, asset management, price fetching, charts, settings
 - All Rust code compiles cleanly (clippy warnings only for unused provider methods)
-- 29 Rust tests passing, 19 frontend tests passing
+- 29 Rust tests passing, 22 frontend tests passing
 - TypeScript strict mode with zero errors
+- Portfolio-level P&L implemented on Dashboard (holdings-aware values, unrealized P&L)
 
 ## What's Built
 ### Backend
@@ -23,7 +24,7 @@
 
 ### Frontend
 - Auth flow: Loading → Setup/Unlock → AppShell
-- Dashboard: Binance-style layout — PortfolioHeader (total value + 24h badge), PortfolioChart (area, time ranges), AllocationBar (stacked % bar + legend), HoldingsTable (full-width clickable rows)
+- Dashboard: Binance-style layout — PortfolioHeader (total value + 24h badge + P&L badge), PortfolioChart (area, time ranges), AllocationBar (stacked % bar + legend), HoldingsTable (Holdings/Value/P&L/Alloc columns, tracked assets dimmed)
 - Asset detail: candlestick/line chart toggle, refresh, inline delete confirmation
 - Add Asset dialog (symbol, name, type)
 - Settings: API key management, refresh interval, about

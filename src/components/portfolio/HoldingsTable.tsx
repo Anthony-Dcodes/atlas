@@ -7,6 +7,11 @@ export interface HoldingRow {
   change24h: number | null;
   allocationPct: number;
   color: string;
+  isHeld: boolean;
+  netQty: number;
+  assetValue: number | null;
+  unrealizedPnL: number | null;
+  pnlPct: number | null;
 }
 
 interface Props {
@@ -19,6 +24,11 @@ const typeBadgeClass: Record<string, string> = {
   crypto: "border-violet-500/40 bg-violet-500/10 text-violet-400",
   commodity: "border-amber-500/40 bg-amber-500/10 text-amber-400",
 };
+
+function formatQty(qty: number, assetType: string): string {
+  const decimals = assetType === "crypto" ? 6 : 2;
+  return qty.toFixed(decimals);
+}
 
 export function HoldingsTable({ rows, onSelect }: Props) {
   return (
@@ -33,6 +43,9 @@ export function HoldingsTable({ rows, onSelect }: Props) {
             <th className="px-6 py-3 text-left font-medium">Name</th>
             <th className="px-6 py-3 text-right font-medium">Price</th>
             <th className="px-6 py-3 text-right font-medium">24h</th>
+            <th className="px-6 py-3 text-right font-medium">Holdings</th>
+            <th className="px-6 py-3 text-right font-medium">Value</th>
+            <th className="px-6 py-3 text-right font-medium">P&L</th>
             <th className="px-6 py-3 text-right font-medium">Alloc</th>
           </tr>
         </thead>
@@ -40,7 +53,9 @@ export function HoldingsTable({ rows, onSelect }: Props) {
           {rows.map((row) => (
             <tr
               key={row.asset.id}
-              className="cursor-pointer border-b border-zinc-800/50 transition-colors last:border-0 hover:bg-zinc-800/40"
+              className={`cursor-pointer border-b border-zinc-800/50 transition-colors last:border-0 hover:bg-zinc-800/40${
+                !row.isHeld ? " opacity-50" : ""
+              }`}
               onClick={() => onSelect(row.asset.id)}
             >
               <td className="px-6 py-4">
@@ -75,8 +90,35 @@ export function HoldingsTable({ rows, onSelect }: Props) {
                   <span className="text-zinc-500">—</span>
                 )}
               </td>
+              <td className="px-6 py-4 text-right tabular-nums text-zinc-300">
+                {row.isHeld ? (
+                  formatQty(row.netQty, row.asset.asset_type)
+                ) : (
+                  <span className="text-zinc-500">---</span>
+                )}
+              </td>
+              <td className="px-6 py-4 text-right tabular-nums text-zinc-100">
+                {row.isHeld && row.assetValue !== null ? (
+                  formatCurrency(row.assetValue)
+                ) : (
+                  <span className="text-zinc-500">---</span>
+                )}
+              </td>
+              <td className="px-6 py-4 text-right tabular-nums">
+                {row.isHeld && row.unrealizedPnL !== null && row.pnlPct !== null ? (
+                  <span className={row.unrealizedPnL >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    {formatCurrency(row.unrealizedPnL)} ({formatPercent(row.pnlPct)})
+                  </span>
+                ) : (
+                  <span className="text-zinc-500">---</span>
+                )}
+              </td>
               <td className="px-6 py-4 text-right tabular-nums text-zinc-400">
-                {row.allocationPct.toFixed(1)}%
+                {row.isHeld ? (
+                  `${row.allocationPct.toFixed(1)}%`
+                ) : (
+                  <span className="text-zinc-500">---</span>
+                )}
               </td>
             </tr>
           ))}

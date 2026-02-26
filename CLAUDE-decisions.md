@@ -69,6 +69,10 @@
 **Decision:** Use `useQueries` from TanStack Query instead of calling `usePrices()` in a loop.
 **Rationale:** React rules of hooks forbid hooks inside loops. `useQueries` takes an array of query configs and returns an array of results — exactly one hook call regardless of asset count.
 
+## Portfolio-Level P&L on Dashboard
+**Decision:** Make Dashboard holdings-aware by adding a second `useQueries` for `getHoldingSummary`, computing portfolio value as `Σ(net_qty × price)` for held assets, and displaying unrealized P&L alongside 24h change.
+**Rationale:** Per-asset P&L infrastructure already existed (`AssetHoldingSummary` backend, `HoldingSummary.tsx`). No backend changes needed — purely frontend aggregation. Tracked-only assets (no transactions) remain visible but dimmed, avoiding confusion between "tracked" and "held" states.
+
 ## Lightweight Charts v5 Migration
 **Decision:** Use v5 API (`chart.addSeries(CandlestickSeries, opts)`) instead of deprecated v4 methods.
 **Rationale:** npm package `lightweight-charts` v5 removed `addCandlestickSeries()`, `addLineSeries()`, etc. Now uses generic `addSeries()` with type parameter.
