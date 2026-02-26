@@ -25,6 +25,24 @@ export async function listTransactions(
   return invoke<Transaction[]>("list_transactions", { assetId });
 }
 
+export async function updateTransaction(
+  id: string,
+  txType: TxType,
+  quantity: number,
+  priceUsd: number,
+  ts: number,
+  notes?: string,
+): Promise<void> {
+  return invoke<void>("update_transaction", {
+    id,
+    txType,
+    quantity,
+    priceUsd,
+    ts,
+    notes: notes ?? null,
+  });
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   return invoke<void>("delete_transaction", { id });
 }

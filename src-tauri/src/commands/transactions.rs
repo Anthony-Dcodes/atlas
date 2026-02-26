@@ -40,6 +40,32 @@ pub fn list_transactions(
 }
 
 #[tauri::command]
+pub fn update_transaction(
+    id: String,
+    tx_type: String,
+    quantity: f64,
+    price_usd: f64,
+    ts: i64,
+    notes: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let tx_type = TxType::from_str(&tx_type).map_err(|e| e.to_string())?;
+    state
+        .with_db(|conn| {
+            queries::transactions::update_transaction(
+                conn,
+                &id,
+                &tx_type,
+                quantity,
+                price_usd,
+                ts,
+                notes.as_deref(),
+            )
+        })
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn delete_transaction(
     id: String,
     state: State<'_, AppState>,

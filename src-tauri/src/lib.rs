@@ -38,6 +38,7 @@ pub fn run() {
             commands::settings::save_setting,
             commands::transactions::add_transaction,
             commands::transactions::list_transactions,
+            commands::transactions::update_transaction,
             commands::transactions::delete_transaction,
             commands::transactions::get_holding_summary,
             commands::search::search_symbols,

@@ -38,17 +38,18 @@ export function HoldingsTable({ rows, onSelect }: Props) {
       <div className="border-b border-zinc-800 px-6 py-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Assets</p>
       </div>
-      <table className="w-full">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[800px]">
         <thead>
           <tr className="border-b border-zinc-800 text-xs text-zinc-500">
-            <th className="px-6 py-3 text-left font-medium">Symbol</th>
-            <th className="px-6 py-3 text-left font-medium">Name</th>
-            <th className="px-6 py-3 text-right font-medium">Price</th>
-            <th className="px-6 py-3 text-right font-medium">24h</th>
-            <th className="px-6 py-3 text-right font-medium">Holdings</th>
-            <th className="px-6 py-3 text-right font-medium">Value</th>
-            <th className="px-6 py-3 text-right font-medium">P&L</th>
-            <th className="px-6 py-3 text-right font-medium">Alloc</th>
+            <th className="px-4 py-3 text-left font-medium">Symbol</th>
+            <th className="px-3 py-3 text-left font-medium">Name</th>
+            <th className="px-3 py-3 text-right font-medium">Price</th>
+            <th className="px-3 py-3 text-right font-medium">24h</th>
+            <th className="px-3 py-3 text-right font-medium">Holdings</th>
+            <th className="px-3 py-3 text-right font-medium">Value</th>
+            <th className="px-3 py-3 text-right font-medium">P&L</th>
+            <th className="px-3 py-3 text-right font-medium">Alloc</th>
           </tr>
         </thead>
         <tbody>
@@ -60,23 +61,23 @@ export function HoldingsTable({ rows, onSelect }: Props) {
               }`}
               onClick={() => onSelect(row.asset.id)}
             >
-              <td className="px-6 py-4">
+              <td className="px-4 py-4">
                 <div className="flex items-center gap-2">
                   <span style={{ color: row.color }}>●</span>
                   <span className="font-semibold text-zinc-100">{row.asset.symbol}</span>
                 </div>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-3 py-4 max-w-[160px]">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-zinc-300">{row.asset.name}</span>
+                  <span className="truncate text-sm text-zinc-300">{row.asset.name}</span>
                   <span
-                    className={`rounded border px-1.5 py-0.5 text-xs ${typeBadgeClass[row.asset.asset_type] ?? ""}`}
+                    className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${typeBadgeClass[row.asset.asset_type] ?? ""}`}
                   >
                     {row.asset.asset_type}
                   </span>
                 </div>
               </td>
-              <td className="px-6 py-4 text-right tabular-nums text-zinc-100">
+              <td className="px-3 py-4 text-right tabular-nums text-zinc-100">
                 {row.latestPrice !== null ? (
                   formatCurrency(row.latestPrice)
                 ) : row.priceLoading ? (
@@ -87,7 +88,7 @@ export function HoldingsTable({ rows, onSelect }: Props) {
                   <span className="text-zinc-500">—</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-right tabular-nums">
+              <td className="px-3 py-4 text-right tabular-nums">
                 {row.change24h !== null ? (
                   <span className={row.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>
                     {formatPercent(row.change24h)}
@@ -96,30 +97,31 @@ export function HoldingsTable({ rows, onSelect }: Props) {
                   <span className="text-zinc-500">—</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-right tabular-nums text-zinc-300">
+              <td className="px-3 py-4 text-right tabular-nums text-zinc-300">
                 {row.isHeld ? (
                   formatQty(row.netQty, row.asset.asset_type)
                 ) : (
                   <span className="text-zinc-500">---</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-right tabular-nums text-zinc-100">
+              <td className="px-3 py-4 text-right tabular-nums text-zinc-100">
                 {row.isHeld && row.assetValue !== null ? (
                   formatCurrency(row.assetValue)
                 ) : (
                   <span className="text-zinc-500">---</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-right tabular-nums">
+              <td className="px-3 py-4 text-right tabular-nums">
                 {row.isHeld && row.unrealizedPnL !== null && row.pnlPct !== null ? (
-                  <span className={row.unrealizedPnL >= 0 ? "text-emerald-400" : "text-red-400"}>
-                    {formatCurrency(row.unrealizedPnL)} ({formatPercent(row.pnlPct)})
-                  </span>
+                  <div className={row.unrealizedPnL >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    <div>{formatCurrency(row.unrealizedPnL)}</div>
+                    <div className="text-xs opacity-70">{formatPercent(row.pnlPct)}</div>
+                  </div>
                 ) : (
                   <span className="text-zinc-500">---</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-right tabular-nums text-zinc-400">
+              <td className="px-3 py-4 text-right tabular-nums text-zinc-400">
                 {row.isHeld ? (
                   `${row.allocationPct.toFixed(1)}%`
                 ) : (
@@ -130,6 +132,7 @@ export function HoldingsTable({ rows, onSelect }: Props) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -151,13 +151,8 @@ impl MarketDataProvider for TwelveDataProvider {
         let items = resp.data.unwrap_or_default();
         let results = items
             .into_iter()
-            .filter(|item| {
-                // Filter to US stocks and major exchanges for relevance
-                item.country.as_deref() == Some("United States")
-                    || item.instrument_type == "Digital Currency"
-                    || item.instrument_type == "Commodity"
-            })
-            .take(8)
+            .filter(|item| item.instrument_type != "Digital Currency")
+            .take(10)
             .map(|item| SymbolSearchResult {
                 symbol: item.symbol,
                 name: item.instrument_name,

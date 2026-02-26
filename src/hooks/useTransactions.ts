@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listTransactions,
   addTransaction,
+  updateTransaction,
   deleteTransaction,
   getHoldingSummary,
 } from "@/lib/tauri/transactions";
@@ -33,6 +34,32 @@ export function useAddTransaction(assetId: string) {
     }) =>
       addTransaction(
         assetId,
+        params.txType,
+        params.quantity,
+        params.priceUsd,
+        params.ts,
+        params.notes,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["holdingSummary", assetId] });
+    },
+  });
+}
+
+export function useUpdateTransaction(assetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      id: string;
+      txType: TxType;
+      quantity: number;
+      priceUsd: number;
+      ts: number;
+      notes?: string;
+    }) =>
+      updateTransaction(
+        params.id,
         params.txType,
         params.quantity,
         params.priceUsd,

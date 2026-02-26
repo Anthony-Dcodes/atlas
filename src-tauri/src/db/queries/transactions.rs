@@ -70,6 +70,25 @@ pub fn soft_delete_transaction(conn: &Connection, id: &str) -> anyhow::Result<()
     Ok(())
 }
 
+pub fn update_transaction(
+    conn: &Connection,
+    id: &str,
+    tx_type: &TxType,
+    quantity: f64,
+    price_usd: f64,
+    ts: i64,
+    notes: Option<&str>,
+) -> anyhow::Result<()> {
+    let updated = conn.execute(
+        "UPDATE transactions SET tx_type = ?1, quantity = ?2, price_usd = ?3, ts = ?4, notes = ?5 WHERE id = ?6 AND deleted_at IS NULL",
+        params![tx_type.as_str(), quantity, price_usd, ts, notes, id],
+    )?;
+    if updated == 0 {
+        anyhow::bail!("Transaction not found");
+    }
+    Ok(())
+}
+
 pub fn get_holding_summary(
     conn: &Connection,
     asset_id: &str,
@@ -183,6 +202,30 @@ mod tests {
         assert_eq!(summary.total_sold, 0.0);
         assert_eq!(summary.net_quantity, 0.0);
         assert_eq!(summary.avg_cost_per_unit, 0.0);
+    }
+
+    #[test]
+    fn test_update_transaction() {
+        let conn = test_db();
+        let asset_id = setup_test_asset(&conn);
+
+        let tx = insert_transaction(&conn, &asset_id, &TxType::Buy, 1.0, 40000.0, 1700000000, Some("original")).unwrap();
+        update_transaction(&conn, &tx.id, &TxType::Sell, 2.0, 45000.0, 1700100000, Some("edited")).unwrap();
+
+        let txs = list_transactions_by_asset(&conn, &asset_id).unwrap();
+        assert_eq!(txs.len(), 1);
+        assert_eq!(txs[0].tx_type, TxType::Sell);
+        assert_eq!(txs[0].quantity, 2.0);
+        assert_eq!(txs[0].price_usd, 45000.0);
+        assert_eq!(txs[0].ts, 1700100000);
+        assert_eq!(txs[0].notes, Some("edited".to_string()));
+    }
+
+    #[test]
+    fn test_update_nonexistent_transaction() {
+        let conn = test_db();
+        let result = update_transaction(&conn, "nonexistent-id", &TxType::Buy, 1.0, 50000.0, 1700000000, None);
+        assert!(result.is_err());
     }
 
     #[test]

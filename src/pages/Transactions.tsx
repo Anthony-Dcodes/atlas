@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAssets } from "@/hooks/useAssets";
 import { AddTransactionDialog } from "@/components/portfolio/AddTransactionDialog";
@@ -8,7 +8,7 @@ import { listTransactions, deleteTransaction } from "@/lib/tauri/transactions";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 import { formatDate } from "@/lib/utils/dateHelpers";
 import type { Asset, Transaction } from "@/types";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface TxWithAsset extends Transaction {
   asset: Asset;
@@ -17,6 +17,7 @@ interface TxWithAsset extends Transaction {
 export function TransactionsPage() {
   const { data: assets, isLoading: assetsLoading } = useAssets();
   const queryClient = useQueryClient();
+  const [editingTx, setEditingTx] = useState<TxWithAsset | null>(null);
 
   const txResults = useQueries({
     queries: (assets ?? []).map((asset) => ({
@@ -114,20 +115,38 @@ export function TransactionsPage() {
                     {formatCurrency(tx.quantity * tx.price_usd)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate({ id: tx.id, assetId: tx.asset.id })}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingTx(tx)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteMutation.mutate({ id: tx.id, assetId: tx.asset.id })}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {editingTx && (
+        <AddTransactionDialog
+          key={editingTx.id}
+          transaction={editingTx}
+          open={!!editingTx}
+          onOpenChange={(v) => { if (!v) setEditingTx(null); }}
+        />
       )}
     </div>
   );

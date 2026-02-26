@@ -16,28 +16,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAddTransaction } from "@/hooks/useTransactions";
+import { useAddTransaction, useUpdateTransaction } from "@/hooks/useTransactions";
 import { useAssets } from "@/hooks/useAssets";
-import type { TxType } from "@/types";
-import { Plus } from "lucide-react";
+import type { Transaction, TxType } from "@/types";
+import { Pencil, Plus } from "lucide-react";
 
 interface Props {
   assetId?: string;
+  transaction?: Transaction;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function AddTransactionDialog({ assetId }: Props) {
-  const [open, setOpen] = useState(false);
+function tsToDateStr(ts: number): string {
+  return new Date(ts * 1000).toISOString().slice(0, 10);
+}
+
+export function AddTransactionDialog({ assetId, transaction, open: controlledOpen, onOpenChange }: Props) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+  const isEdit = !!transaction;
+  const effectiveAssetId = assetId ?? transaction?.asset_id ?? "";
+
   const [selectedAssetId, setSelectedAssetId] = useState("");
-  const [txType, setTxType] = useState<TxType>("buy");
-  const [quantity, setQuantity] = useState("");
-  const [priceUsd, setPriceUsd] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
+  const [txType, setTxType] = useState<TxType>(transaction?.tx_type ?? "buy");
+  const [quantity, setQuantity] = useState(transaction ? String(transaction.quantity) : "");
+  const [priceUsd, setPriceUsd] = useState(transaction ? String(transaction.price_usd) : "");
+  const [date, setDate] = useState(transaction ? tsToDateStr(transaction.ts) : () => new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState(transaction?.notes ?? "");
   const [error, setError] = useState("");
   const { data: assets } = useAssets();
-  const addTransaction = useAddTransaction(assetId ?? selectedAssetId);
+  const addTransaction = useAddTransaction(effectiveAssetId || selectedAssetId);
+  const updateTx = useUpdateTransaction(effectiveAssetId || selectedAssetId);
 
   function reset() {
+    if (isEdit) return;
     setSelectedAssetId("");
     setTxType("buy");
     setQuantity("");
@@ -51,7 +65,7 @@ export function AddTransactionDialog({ assetId }: Props) {
     e.preventDefault();
     setError("");
 
-    if (!assetId && !selectedAssetId) {
+    if (!isEdit && !assetId && !selectedAssetId) {
       setError("Please select an asset");
       return;
     }
@@ -75,13 +89,24 @@ export function AddTransactionDialog({ assetId }: Props) {
     const ts = Math.floor(new Date(date).getTime() / 1000);
 
     try {
-      await addTransaction.mutateAsync({
-        txType,
-        quantity: qty,
-        priceUsd: price,
-        ts,
-        notes: notes.trim() || undefined,
-      });
+      if (isEdit) {
+        await updateTx.mutateAsync({
+          id: transaction.id,
+          txType,
+          quantity: qty,
+          priceUsd: price,
+          ts,
+          notes: notes.trim() || undefined,
+        });
+      } else {
+        await addTransaction.mutateAsync({
+          txType,
+          quantity: qty,
+          priceUsd: price,
+          ts,
+          notes: notes.trim() || undefined,
+        });
+      }
       reset();
       setOpen(false);
     } catch (err) {
@@ -89,20 +114,24 @@ export function AddTransactionDialog({ assetId }: Props) {
     }
   }
 
+  const isPending = isEdit ? updateTx.isPending : addTransaction.isPending;
+
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Transaction
-        </Button>
-      </DialogTrigger>
+      {!isEdit && (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="bg-card">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!assetId && (
+          {!isEdit && !assetId && (
             <div className="space-y-2">
               <Label>Asset</Label>
               <Select value={selectedAssetId} onValueChange={setSelectedAssetId}>
@@ -174,8 +203,10 @@ export function AddTransactionDialog({ assetId }: Props) {
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={addTransaction.isPending}>
-            {addTransaction.isPending ? "Adding..." : "Add Transaction"}
+          <Button type="submit" className="w-full" disabled={isPending}>
+            {isPending
+              ? (isEdit ? "Saving..." : "Adding...")
+              : (isEdit ? "Save Changes" : "Add Transaction")}
           </Button>
         </form>
       </DialogContent>
