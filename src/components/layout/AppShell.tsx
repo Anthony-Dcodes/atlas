@@ -2,6 +2,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { Dashboard } from "@/pages/Dashboard";
+import { TransactionsPage } from "@/pages/Transactions";
 import { SettingsPage } from "@/pages/Settings";
 
 export function AppShell() {
@@ -14,6 +15,7 @@ export function AppShell() {
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
           {activePage === "dashboard" && <Dashboard />}
+          {activePage === "transactions" && <TransactionsPage />}
           {activePage === "settings" && <SettingsPage />}
         </main>
       </div>

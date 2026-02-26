@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils";
 import { useNavigationStore, type Page } from "@/stores/navigationStore";
-import { LayoutDashboard, Settings } from "lucide-react";
+import { LayoutDashboard, Receipt, Settings } from "lucide-react";
 
 const navItems: { page: Page; label: string; icon: typeof LayoutDashboard }[] = [
   { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { page: "transactions", label: "Transactions", icon: Receipt },
   { page: "settings", label: "Settings", icon: Settings },
 ];
 

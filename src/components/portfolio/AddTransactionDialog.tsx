@@ -17,24 +17,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAddTransaction } from "@/hooks/useTransactions";
+import { useAssets } from "@/hooks/useAssets";
 import type { TxType } from "@/types";
 import { Plus } from "lucide-react";
 
 interface Props {
-  assetId: string;
+  assetId?: string;
 }
 
 export function AddTransactionDialog({ assetId }: Props) {
   const [open, setOpen] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
   const [txType, setTxType] = useState<TxType>("buy");
   const [quantity, setQuantity] = useState("");
   const [priceUsd, setPriceUsd] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
-  const addTransaction = useAddTransaction(assetId);
+  const { data: assets } = useAssets();
+  const addTransaction = useAddTransaction(assetId ?? selectedAssetId);
 
   function reset() {
+    setSelectedAssetId("");
     setTxType("buy");
     setQuantity("");
     setPriceUsd("");
@@ -46,6 +50,11 @@ export function AddTransactionDialog({ assetId }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!assetId && !selectedAssetId) {
+      setError("Please select an asset");
+      return;
+    }
 
     const qty = parseFloat(quantity);
     const price = parseFloat(priceUsd);
@@ -93,6 +102,23 @@ export function AddTransactionDialog({ assetId }: Props) {
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!assetId && (
+            <div className="space-y-2">
+              <Label>Asset</Label>
+              <Select value={selectedAssetId} onValueChange={setSelectedAssetId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an asset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(assets ?? []).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.symbol} — {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Type</Label>
             <Select value={txType} onValueChange={(v) => setTxType(v as TxType)}>

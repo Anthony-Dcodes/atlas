@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAddAsset } from "@/hooks/useAssets";
+import { addTransaction } from "@/lib/tauri/transactions";
 import type { AssetType } from "@/types";
 import { Plus } from "lucide-react";
 
@@ -25,6 +26,9 @@ export function AddAssetDialog() {
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [assetType, setAssetType] = useState<AssetType>("stock");
+  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [purchaseQty, setPurchaseQty] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [error, setError] = useState("");
   const addAsset = useAddAsset();
 
@@ -32,6 +36,9 @@ export function AddAssetDialog() {
     setSymbol("");
     setName("");
     setAssetType("stock");
+    setPurchaseDate(new Date().toISOString().slice(0, 10));
+    setPurchaseQty("");
+    setPurchasePrice("");
     setError("");
   }
 
@@ -48,8 +55,38 @@ export function AddAssetDialog() {
       return;
     }
 
+    const hasQty = purchaseQty !== "";
+    const hasPrice = purchasePrice !== "";
+    // date is pre-filled; use qty/price to detect if the user intends to record a purchase
+    const hasAny = hasQty || hasPrice;
+    const hasAll = purchaseDate !== "" && hasQty && hasPrice;
+
+    if (hasAny && !hasAll) {
+      setError("Complete all purchase fields or leave them all empty");
+      return;
+    }
+
+    let parsedQty: number | undefined;
+    let parsedPrice: number | undefined;
+    if (hasAll) {
+      parsedQty = parseFloat(purchaseQty);
+      parsedPrice = parseFloat(purchasePrice);
+      if (isNaN(parsedQty) || parsedQty <= 0) {
+        setError("Purchase quantity must be a positive number");
+        return;
+      }
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        setError("Purchase price must be a positive number");
+        return;
+      }
+    }
+
     try {
-      await addAsset.mutateAsync({ symbol: symbol.trim(), name: name.trim(), assetType });
+      const asset = await addAsset.mutateAsync({ symbol: symbol.trim(), name: name.trim(), assetType });
+      if (hasAll && parsedQty !== undefined && parsedPrice !== undefined) {
+        const ts = Math.floor(new Date(purchaseDate).getTime() / 1000);
+        await addTransaction(asset.id, "buy", parsedQty, parsedPrice, ts, undefined);
+      }
       reset();
       setOpen(false);
     } catch (err) {
@@ -101,6 +138,44 @@ export function AddAssetDialog() {
                 <SelectItem value="commodity">Commodity</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Initial Purchase (optional)
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="purchaseDate">Date</Label>
+              <Input
+                id="purchaseDate"
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="purchaseQty">Quantity</Label>
+              <Input
+                id="purchaseQty"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="e.g. 10"
+                value={purchaseQty}
+                onChange={(e) => setPurchaseQty(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="purchasePrice">Price per unit (USD)</Label>
+              <Input
+                id="purchasePrice"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="e.g. 150.00"
+                value={purchasePrice}
+                onChange={(e) => setPurchasePrice(e.target.value)}
+              />
+            </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={addAsset.isPending}>
