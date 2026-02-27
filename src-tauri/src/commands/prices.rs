@@ -42,7 +42,7 @@ pub async fn fetch_prices(
             from: match max_ts {
                 Some(ts) => ts + 86400, // day after last stored price
                 None => match asset.asset_type {
-                    AssetType::Crypto => 946684800, // 2000-01-01: CoinGecko returns what exists
+                    AssetType::Crypto => now - (364 * 86400), // CoinGecko Demo: 365-day history limit
                     _ => 0, // TwelveData: will use outputsize=5000 for max history
                 },
             },
