@@ -126,7 +126,7 @@ export function SettingsPage() {
           <ApiKeyField
             provider="coingecko"
             label="CoinGecko"
-            description="Required for cryptocurrency data. Get a free Demo key at coingecko.com/api/pricing"
+            description="Optional. Free tier works without a key (365-day history). Add a paid plan key at coingecko.com/api/pricing for full history."
           />
         </CardContent>
       </Card>
