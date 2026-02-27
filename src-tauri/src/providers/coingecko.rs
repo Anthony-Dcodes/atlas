@@ -2,18 +2,32 @@ use crate::models::{DateRange, OHLCVRow, SymbolSearchResult};
 use crate::providers::MarketDataProvider;
 use async_trait::async_trait;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 pub struct CoinGeckoProvider {
     client: reqwest::Client,
+    api_key: Option<String>,
 }
 
 impl CoinGeckoProvider {
     pub fn new() -> Self {
+        Self::new_with_key(None)
+    }
+
+    pub fn new_with_key(api_key: Option<String>) -> Self {
         Self {
             client: reqwest::Client::builder()
                 .user_agent("atlas/0.1")
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
+            api_key,
+        }
+    }
+
+    fn auth_params(&self) -> Vec<(&str, String)> {
+        match &self.api_key {
+            Some(key) => vec![("x_cg_demo_api_key", key.clone())],
+            None => vec![],
         }
     }
 }
@@ -41,6 +55,12 @@ pub fn ticker_to_coin_id(ticker: &str) -> String {
 }
 
 #[derive(Deserialize)]
+struct MarketChartResponse {
+    prices: Vec<[f64; 2]>,
+    total_volumes: Vec<[f64; 2]>,
+}
+
+#[derive(Deserialize)]
 struct CoinSearchResponse {
     coins: Vec<CoinSearchItem>,
 }
@@ -54,32 +74,12 @@ struct CoinSearchItem {
 #[derive(Deserialize)]
 struct SimplePriceResponse {
     #[serde(flatten)]
-    prices: std::collections::HashMap<String, CoinPrice>,
+    prices: HashMap<String, CoinPrice>,
 }
 
 #[derive(Deserialize)]
 struct CoinPrice {
     usd: Option<f64>,
-}
-
-/// Convert a DateRange `from` timestamp to the nearest valid CoinGecko OHLC `days` value.
-/// First fetch (from <= Y2K) uses "max" to request all available history.
-fn to_ohlc_days(range_from: i64, range_to: i64) -> String {
-    // Sentinel for "get everything" — first fetch sets from = 946684800 (2000-01-01)
-    if range_from <= 946684800 {
-        return "max".to_string();
-    }
-    let days = ((range_to - range_from) / 86400) + 2; // +2 day buffer
-    match days {
-        d if d <= 7 => "7",
-        d if d <= 14 => "14",
-        d if d <= 30 => "30",
-        d if d <= 90 => "90",
-        d if d <= 180 => "180",
-        d if d <= 365 => "365",
-        _ => "max",
-    }
-    .to_string()
 }
 
 #[async_trait]
@@ -90,41 +90,62 @@ impl MarketDataProvider for CoinGeckoProvider {
 
     async fn fetch_ohlcv(&self, symbol: &str, range: &DateRange) -> anyhow::Result<Vec<OHLCVRow>> {
         let coin_id = ticker_to_coin_id(symbol);
-        let days = to_ohlc_days(range.from, range.to);
 
-        // /ohlc returns [[ts_ms, open, high, low, close], ...]
-        let raw: Vec<[f64; 5]> = self
+        // /market_chart/range returns { prices: [[ts_ms, close], ...], total_volumes: [[ts_ms, vol], ...] }
+        // Uses explicit from/to Unix timestamps — perfect for incremental fetching.
+        // Daily granularity for ranges > 90 days; hourly for shorter ranges (deduped to daily below).
+        let mut query: Vec<(&str, String)> = vec![
+            ("vs_currency", "usd".to_string()),
+            ("from", range.from.to_string()),
+            ("to", range.to.to_string()),
+        ];
+        query.extend(self.auth_params());
+
+        let resp: MarketChartResponse = self
             .client
             .get(format!(
-                "https://api.coingecko.com/api/v3/coins/{}/ohlc",
+                "https://api.coingecko.com/api/v3/coins/{}/market_chart/range",
                 coin_id
             ))
-            .query(&[("vs_currency", "usd"), ("days", days.as_str())])
+            .query(&query)
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 
-        let mut rows = Vec::with_capacity(raw.len());
-        for point in &raw {
-            let ts_ms = point[0];
-            let ts = (ts_ms / 1000.0) as i64;
-            // Normalize to start of day (UTC midnight)
-            let ts_day = ts - (ts % 86400);
+        // Build volume map keyed by ts_day for O(1) lookup
+        let volume_map: HashMap<i64, f64> = resp
+            .total_volumes
+            .iter()
+            .map(|point| {
+                let ts = (point[0] / 1000.0) as i64;
+                let ts_day = ts - (ts % 86400);
+                (ts_day, point[1])
+            })
+            .collect();
 
-            rows.push(OHLCVRow {
-                id: None,
-                asset_id: String::new(),
-                ts: ts_day,
-                open: Some(point[1]),
-                high: Some(point[2]),
-                low: Some(point[3]),
-                close: point[4],
-                volume: None,
-            });
-        }
+        let mut rows: Vec<OHLCVRow> = resp
+            .prices
+            .iter()
+            .map(|point| {
+                let ts = (point[0] / 1000.0) as i64;
+                let ts_day = ts - (ts % 86400);
+                let close = point[1];
+                OHLCVRow {
+                    id: None,
+                    asset_id: String::new(),
+                    ts: ts_day,
+                    open: Some(close),
+                    high: Some(close),
+                    low: Some(close),
+                    close,
+                    volume: volume_map.get(&ts_day).copied(),
+                }
+            })
+            .collect();
 
-        // Deduplicate by day — keep the last candle per day (most recent for intraday ranges)
+        // Sort by timestamp, then deduplicate by day (keeps last point per day for hourly ranges)
         rows.sort_by_key(|r| r.ts);
         rows.dedup_by_key(|r| r.ts);
         Ok(rows)
@@ -133,12 +154,19 @@ impl MarketDataProvider for CoinGeckoProvider {
     async fn fetch_current_price(&self, symbol: &str) -> anyhow::Result<f64> {
         let coin_id = ticker_to_coin_id(symbol);
 
+        let mut query: Vec<(&str, String)> = vec![
+            ("ids", coin_id.clone()),
+            ("vs_currencies", "usd".to_string()),
+        ];
+        query.extend(self.auth_params());
+
         let resp: SimplePriceResponse = self
             .client
             .get("https://api.coingecko.com/api/v3/simple/price")
-            .query(&[("ids", coin_id.as_str()), ("vs_currencies", "usd")])
+            .query(&query)
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 
@@ -149,12 +177,16 @@ impl MarketDataProvider for CoinGeckoProvider {
     }
 
     async fn search_symbols(&self, query: &str) -> anyhow::Result<Vec<SymbolSearchResult>> {
+        let mut params: Vec<(&str, String)> = vec![("query", query.to_string())];
+        params.extend(self.auth_params());
+
         let resp: CoinSearchResponse = self
             .client
             .get("https://api.coingecko.com/api/v3/search")
-            .query(&[("query", query)])
+            .query(&params)
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 

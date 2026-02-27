@@ -52,7 +52,10 @@ pub async fn fetch_prices(
         let provider_name;
         let result = match asset.asset_type {
             AssetType::Crypto => {
-                let provider = CoinGeckoProvider::new();
+                let api_key = state
+                    .with_db(|conn| queries::settings::get_setting(conn, "coingecko_api_key"))
+                    .map_err(|e| e.to_string())?;
+                let provider = CoinGeckoProvider::new_with_key(api_key.filter(|k| !k.is_empty()));
                 provider_name = provider.name().to_string();
                 state
                     .check_rate_limit(&provider_name)

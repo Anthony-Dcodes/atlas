@@ -123,15 +123,11 @@ export function SettingsPage() {
             label="Alpha Vantage"
             description="Optional. Used for macro data (CPI, GDP). Get a key at alphavantage.co"
           />
-          <div className="space-y-1">
-            <Label>CoinGecko</Label>
-            <p className="text-xs text-muted-foreground">
-              No API key needed. Free tier used for cryptocurrency data.
-            </p>
-            <span className="flex items-center gap-1 text-xs text-green">
-              <Check className="h-3 w-3" /> Available
-            </span>
-          </div>
+          <ApiKeyField
+            provider="coingecko"
+            label="CoinGecko"
+            description="Required for cryptocurrency data. Get a free Demo key at coingecko.com/api/pricing"
+          />
         </CardContent>
       </Card>
 
