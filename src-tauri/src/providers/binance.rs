@@ -147,6 +147,10 @@ impl MarketDataProvider for BinanceProvider {
 
     async fn search_symbols(&self, query: &str) -> anyhow::Result<Vec<SymbolSearchResult>> {
         let query_upper = query.to_uppercase();
+        // Strip common quote suffixes so "BTCUSDT" searches the same as "BTC"
+        let search_base = query_upper
+            .trim_end_matches("USDT")
+            .trim_end_matches("BUSD");
 
         // Fetch all active ticker prices; filter USDT pairs whose base starts with the query
         let tickers: Vec<TickerPrice> = self
@@ -163,7 +167,7 @@ impl MarketDataProvider for BinanceProvider {
             .filter(|t| t.symbol.ends_with("USDT"))
             .filter_map(|t| {
                 let base = t.symbol.strip_suffix("USDT")?;
-                if base.starts_with(query_upper.as_str()) {
+                if base.starts_with(search_base) {
                     Some(SymbolSearchResult {
                         symbol: base.to_string(),
                         name: base.to_string(),
