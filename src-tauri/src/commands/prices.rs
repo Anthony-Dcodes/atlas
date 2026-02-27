@@ -1,5 +1,6 @@
 use crate::db::queries;
 use crate::models::{AssetType, DateRange, OHLCVRow};
+use crate::providers::binance::BinanceProvider;
 use crate::providers::coingecko::CoinGeckoProvider;
 use crate::providers::twelve_data::TwelveDataProvider;
 use crate::providers::MarketDataProvider;
@@ -41,10 +42,7 @@ pub async fn fetch_prices(
         let range = DateRange {
             from: match max_ts {
                 Some(ts) => ts + 86400, // day after last stored price
-                None => match asset.asset_type {
-                    AssetType::Crypto => now - (364 * 86400), // CoinGecko Demo: 365-day history limit
-                    _ => 0, // TwelveData: will use outputsize=5000 for max history
-                },
+                None => 0, // Each provider handles 0 as "max history" internally
             },
             to: now,
         };
@@ -52,15 +50,33 @@ pub async fn fetch_prices(
         let provider_name;
         let result = match asset.asset_type {
             AssetType::Crypto => {
-                let api_key = state
-                    .with_db(|conn| queries::settings::get_setting(conn, "coingecko_api_key"))
-                    .map_err(|e| e.to_string())?;
-                let provider = CoinGeckoProvider::new_with_key(api_key.filter(|k| !k.is_empty()));
-                provider_name = provider.name().to_string();
+                // Binance: free, no key, real OHLCV, history from 2017
+                let binance = BinanceProvider::new();
+                let binance_name = binance.name().to_string();
                 state
-                    .check_rate_limit(&provider_name)
+                    .check_rate_limit(&binance_name)
                     .map_err(|e| e.to_string())?;
-                provider.fetch_ohlcv(&asset.symbol, &range).await
+                match binance.fetch_ohlcv(&asset.symbol, &range).await {
+                    Ok(rows) => {
+                        provider_name = binance_name;
+                        Ok(rows)
+                    }
+                    Err(_) => {
+                        // Fallback: coin not listed on Binance → try CoinGecko
+                        let api_key = state
+                            .with_db(|conn| {
+                                queries::settings::get_setting(conn, "coingecko_api_key")
+                            })
+                            .map_err(|e| e.to_string())?;
+                        let cg =
+                            CoinGeckoProvider::new_with_key(api_key.filter(|k| !k.is_empty()));
+                        provider_name = cg.name().to_string();
+                        state
+                            .check_rate_limit(&provider_name)
+                            .map_err(|e| e.to_string())?;
+                        cg.fetch_ohlcv(&asset.symbol, &range).await
+                    }
+                }
             }
             _ => {
                 // Need API key for Twelve Data

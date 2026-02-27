@@ -25,6 +25,7 @@ import { Plus, Search } from "lucide-react";
 const providerBadgeClass: Record<string, string> = {
   TwelveData: "border-blue-500/40 bg-blue-500/10 text-blue-400",
   CoinGecko: "border-violet-500/40 bg-violet-500/10 text-violet-400",
+  Binance: "border-yellow-500/40 bg-yellow-500/10 text-yellow-400",
 };
 
 const typeBadgeClass: Record<string, string> = {

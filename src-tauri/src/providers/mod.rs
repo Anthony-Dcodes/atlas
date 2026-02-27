@@ -1,3 +1,4 @@
+pub mod binance;
 pub mod coingecko;
 pub mod twelve_data;
 

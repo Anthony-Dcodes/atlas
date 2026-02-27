@@ -91,12 +91,21 @@ impl MarketDataProvider for CoinGeckoProvider {
     async fn fetch_ohlcv(&self, symbol: &str, range: &DateRange) -> anyhow::Result<Vec<OHLCVRow>> {
         let coin_id = ticker_to_coin_id(symbol);
 
+        // Clamp `from` to within the 365-day free-tier limit.
+        // Handles range.from == 0 (first fetch via CoinGecko fallback path).
+        let limit = chrono::Utc::now().timestamp() - 364 * 86400;
+        let from = if range.from == 0 || range.from < limit {
+            limit
+        } else {
+            range.from
+        };
+
         // /market_chart/range returns { prices: [[ts_ms, close], ...], total_volumes: [[ts_ms, vol], ...] }
         // Uses explicit from/to Unix timestamps — perfect for incremental fetching.
         // Daily granularity for ranges > 90 days; hourly for shorter ranges (deduped to daily below).
         let mut query: Vec<(&str, String)> = vec![
             ("vs_currency", "usd".to_string()),
-            ("from", range.from.to_string()),
+            ("from", from.to_string()),
             ("to", range.to.to_string()),
         ];
         query.extend(self.auth_params());

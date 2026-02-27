@@ -33,6 +33,7 @@ impl AppState {
         let max_requests = match provider {
             "twelve_data" => 8,
             "coingecko" => 30,
+            "binance" => 60,
             "alpha_vantage" => 25,
             _ => 10,
         };
