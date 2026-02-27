@@ -60,26 +60,52 @@ export function PortfolioChart({ allPrices, holdings, height = 300 }: Props) {
 
     chartRef.current = chart;
 
-    // Aggregate all prices by timestamp (sum close prices)
+    // Aggregate portfolio value with forward-fill for missing days (e.g. weekends)
     const rangeStart = getRangeStart(timeRange);
-    const priceMap = new Map<number, number>();
+
+    // Collect per-asset sorted price arrays for held assets only
+    const assetArrays: { qty: number; prices: OHLCVRow[] }[] = [];
+    const allTimestamps = new Set<number>();
 
     for (const [assetId, rows] of allPrices.entries()) {
       const qty = holdings.get(assetId);
       if (qty === undefined || qty <= 0) continue;
-      for (const row of rows) {
-        if (row.ts >= rangeStart) {
-          priceMap.set(row.ts, (priceMap.get(row.ts) ?? 0) + qty * row.close);
-        }
-      }
+      const filtered = rows.filter((r) => r.ts >= rangeStart).sort((a, b) => a.ts - b.ts);
+      if (filtered.length === 0) continue;
+      assetArrays.push({ qty, prices: filtered });
+      for (const r of filtered) allTimestamps.add(r.ts);
     }
 
-    const chartData: AreaData<UTCTimestamp>[] = Array.from(priceMap.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([ts, value]) => ({
-        time: ts as UTCTimestamp,
-        value,
-      }));
+    // Binary search: find last price with ts <= target
+    function getLastKnownClose(prices: OHLCVRow[], target: number): number | null {
+      let lo = 0;
+      let hi = prices.length - 1;
+      let result: number | null = null;
+      while (lo <= hi) {
+        const mid = (lo + hi) >>> 1;
+        if (prices[mid]!.ts <= target) {
+          result = prices[mid]!.close;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      return result;
+    }
+
+    const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+    const chartData: AreaData<UTCTimestamp>[] = sortedTimestamps.flatMap((ts) => {
+      let total = 0;
+      let hasAny = false;
+      for (const { qty, prices } of assetArrays) {
+        const close = getLastKnownClose(prices, ts);
+        if (close !== null) {
+          total += qty * close;
+          hasAny = true;
+        }
+      }
+      return hasAny ? [{ time: ts as UTCTimestamp, value: total }] : [];
+    });
 
     if (chartData.length > 0) {
       const series = chart.addSeries(AreaSeries, {

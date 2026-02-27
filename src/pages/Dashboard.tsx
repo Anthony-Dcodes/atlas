@@ -1,8 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useAssets } from "@/hooks/useAssets";
 import { useAssetsStore } from "@/stores/assetsStore";
 import { AddAssetDialog } from "@/components/portfolio/AddAssetDialog";
+import { AddTransactionDialog } from "@/components/portfolio/AddTransactionDialog";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { AssetDetail } from "@/components/portfolio/AssetDetail";
 import { PortfolioChart } from "@/components/charts/PortfolioChart";
 import { PortfolioHeader } from "@/components/portfolio/PortfolioHeader";
@@ -20,6 +23,14 @@ export function Dashboard() {
   const { selectedAssetId, setSelectedAssetId } = useAssetsStore();
 
   const selectedAsset = assets?.find((a) => a.id === selectedAssetId);
+
+  const [txDialogOpen, setTxDialogOpen] = useState(false);
+  const [txAssetId, setTxAssetId] = useState<string | undefined>(undefined);
+
+  const handleAddTransaction = useCallback((assetId?: string) => {
+    setTxAssetId(assetId);
+    setTxDialogOpen(true);
+  }, []);
 
   const priceResults = useQueries({
     queries: (assets ?? []).map((asset) => ({
@@ -157,7 +168,13 @@ export function Dashboard() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-zinc-100">Portfolio Overview</h2>
-        <AddAssetDialog />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => handleAddTransaction()}>
+            <Plus className="mr-1 h-4 w-4" />
+            Add Transaction
+          </Button>
+          <AddAssetDialog />
+        </div>
       </div>
 
       {isLoading && <p className="text-muted-foreground">Loading assets...</p>}
@@ -197,10 +214,17 @@ export function Dashboard() {
 
           {/* Section C: Holdings table */}
           {derived.holdingRows.length > 0 && (
-            <HoldingsTable rows={derived.holdingRows} onSelect={setSelectedAssetId} />
+            <HoldingsTable rows={derived.holdingRows} onSelect={setSelectedAssetId} onAddTransaction={handleAddTransaction} />
           )}
         </>
       )}
+
+      <AddTransactionDialog
+        key={txAssetId ?? "no-asset"}
+        assetId={txAssetId}
+        open={txDialogOpen}
+        onOpenChange={setTxDialogOpen}
+      />
     </div>
   );
 }
