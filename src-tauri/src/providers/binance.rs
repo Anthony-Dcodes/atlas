@@ -19,8 +19,22 @@ impl BinanceProvider {
     }
 
     fn to_symbol(ticker: &str) -> String {
-        format!("{}USDT", ticker.to_uppercase())
+        let upper = ticker.to_uppercase();
+        let base = upper.trim_end_matches("USDT").trim_end_matches("BUSD");
+        format!("{}USDT", base)
     }
+}
+
+/// Strip any trailing partial match of "USDT" so queries like
+/// "BTCU", "BTCUS", "BTCUSD", "BTCUSDT" all reduce to "BTC".
+fn strip_partial_usdt(s: &str) -> &str {
+    const SUFFIX: &str = "USDT";
+    for len in (1..=SUFFIX.len().min(s.len())).rev() {
+        if s.ends_with(&SUFFIX[..len]) {
+            return &s[..s.len() - len];
+        }
+    }
+    s
 }
 
 #[derive(Deserialize)]
@@ -147,10 +161,8 @@ impl MarketDataProvider for BinanceProvider {
 
     async fn search_symbols(&self, query: &str) -> anyhow::Result<Vec<SymbolSearchResult>> {
         let query_upper = query.to_uppercase();
-        // Strip common quote suffixes so "BTCUSDT" searches the same as "BTC"
-        let search_base = query_upper
-            .trim_end_matches("USDT")
-            .trim_end_matches("BUSD");
+        // Strip any partial USDT suffix so "BTCU"/"BTCUS"/"BTCUSD"/"BTCUSDT" all find BTC
+        let search_base = strip_partial_usdt(&query_upper);
 
         // Fetch all active ticker prices; filter USDT pairs whose base starts with the query
         let tickers: Vec<TickerPrice> = self
@@ -169,7 +181,8 @@ impl MarketDataProvider for BinanceProvider {
                 let base = t.symbol.strip_suffix("USDT")?;
                 if base.starts_with(search_base) {
                     Some(SymbolSearchResult {
-                        symbol: base.to_string(),
+                        // Return full Binance ticker so users see what they typed
+                        symbol: format!("{}USDT", base),
                         name: base.to_string(),
                         asset_type: "crypto".to_string(),
                         provider: "Binance".to_string(),

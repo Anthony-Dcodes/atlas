@@ -33,9 +33,12 @@ impl CoinGeckoProvider {
 }
 
 /// Map common crypto tickers to CoinGecko coin IDs.
+/// Strips USDT/BUSD suffixes first so "BTCUSDT" maps the same as "BTC".
 /// Returns an owned String to avoid lifetime issues with unknown tickers.
 pub fn ticker_to_coin_id(ticker: &str) -> String {
-    match ticker.to_uppercase().as_str() {
+    let upper = ticker.to_uppercase();
+    let base = upper.trim_end_matches("USDT").trim_end_matches("BUSD");
+    match base {
         "BTC" => "bitcoin".to_string(),
         "ETH" => "ethereum".to_string(),
         "SOL" => "solana".to_string(),
