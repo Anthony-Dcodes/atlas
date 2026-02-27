@@ -29,6 +29,8 @@ pub fn run() {
             commands::assets::add_asset,
             commands::assets::remove_asset,
             commands::assets::list_assets,
+            commands::assets::list_all_assets,
+            commands::assets::purge_asset,
             commands::prices::fetch_prices,
             commands::prices::refresh_asset,
             commands::settings::save_api_key,

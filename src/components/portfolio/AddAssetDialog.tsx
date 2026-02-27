@@ -40,8 +40,10 @@ export function AddAssetDialog() {
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [assetType, setAssetType] = useState<AssetType>("stock");
+  const [purchaseMode, setPurchaseMode] = useState<"quantity" | "total">("quantity");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [purchaseQty, setPurchaseQty] = useState("");
+  const [purchaseTotal, setPurchaseTotal] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [error, setError] = useState("");
   const addAsset = useAddAsset();
@@ -54,8 +56,10 @@ export function AddAssetDialog() {
     setSymbol("");
     setName("");
     setAssetType("stock");
+    setPurchaseMode("quantity");
     setPurchaseDate(new Date().toISOString().slice(0, 10));
     setPurchaseQty("");
+    setPurchaseTotal("");
     setPurchasePrice("");
     setError("");
   }
@@ -84,10 +88,10 @@ export function AddAssetDialog() {
       return;
     }
 
-    const hasQty = purchaseQty !== "";
+    const hasAmount = purchaseMode === "quantity" ? purchaseQty !== "" : purchaseTotal !== "";
     const hasPrice = purchasePrice !== "";
-    const hasAny = hasQty || hasPrice;
-    const hasAll = purchaseDate !== "" && hasQty && hasPrice;
+    const hasAny = hasAmount || hasPrice;
+    const hasAll = purchaseDate !== "" && hasAmount && hasPrice;
 
     if (hasAny && !hasAll) {
       setError("Complete all purchase fields or leave them all empty");
@@ -97,14 +101,27 @@ export function AddAssetDialog() {
     let parsedQty: number | undefined;
     let parsedPrice: number | undefined;
     if (hasAll) {
-      parsedQty = parseFloat(purchaseQty);
       parsedPrice = parseFloat(purchasePrice);
-      if (isNaN(parsedQty) || parsedQty <= 0) {
-        setError("Purchase quantity must be a positive number");
-        return;
-      }
       if (isNaN(parsedPrice) || parsedPrice <= 0) {
         setError("Purchase price must be a positive number");
+        return;
+      }
+      if (purchaseMode === "total") {
+        const parsedTotal = parseFloat(purchaseTotal);
+        if (isNaN(parsedTotal) || parsedTotal <= 0) {
+          setError("Total amount must be a positive number");
+          return;
+        }
+        parsedQty = parsedTotal / parsedPrice;
+      } else {
+        parsedQty = parseFloat(purchaseQty);
+        if (isNaN(parsedQty) || parsedQty <= 0) {
+          setError("Purchase quantity must be a positive number");
+          return;
+        }
+      }
+      if (!isFinite(parsedQty) || parsedQty <= 0) {
+        setError("Computed quantity is invalid");
         return;
       }
     }
@@ -226,6 +243,22 @@ export function AddAssetDialog() {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Initial Purchase (optional)
             </p>
+            <div className="flex rounded-md bg-zinc-800 p-0.5">
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${purchaseMode === "quantity" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setPurchaseMode("quantity")}
+              >
+                By Quantity
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${purchaseMode === "total" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setPurchaseMode("total")}
+              >
+                By Total
+              </button>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="purchaseDate">Date</Label>
               <Input
@@ -235,18 +268,33 @@ export function AddAssetDialog() {
                 onChange={(e) => setPurchaseDate(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="purchaseQty">Quantity</Label>
-              <Input
-                id="purchaseQty"
-                type="number"
-                step="any"
-                min="0"
-                placeholder="e.g. 10"
-                value={purchaseQty}
-                onChange={(e) => setPurchaseQty(e.target.value)}
-              />
-            </div>
+            {purchaseMode === "quantity" ? (
+              <div className="space-y-2">
+                <Label htmlFor="purchaseQty">Quantity</Label>
+                <Input
+                  id="purchaseQty"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 10"
+                  value={purchaseQty}
+                  onChange={(e) => setPurchaseQty(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="purchaseTotal">Total Amount (USD)</Label>
+                <Input
+                  id="purchaseTotal"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 1000"
+                  value={purchaseTotal}
+                  onChange={(e) => setPurchaseTotal(e.target.value)}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="purchasePrice">Price per unit (USD)</Label>
               <Input
@@ -259,6 +307,16 @@ export function AddAssetDialog() {
                 onChange={(e) => setPurchasePrice(e.target.value)}
               />
             </div>
+            {purchaseMode === "quantity" && purchaseQty && purchasePrice && parseFloat(purchaseQty) > 0 && parseFloat(purchasePrice) > 0 && (
+              <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
+                Total: <span className="text-zinc-200">${(parseFloat(purchaseQty) * parseFloat(purchasePrice)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {purchaseMode === "total" && purchaseTotal && purchasePrice && parseFloat(purchaseTotal) > 0 && parseFloat(purchasePrice) > 0 && (
+              <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
+                Quantity: <span className="text-zinc-200">{(parseFloat(purchaseTotal) / parseFloat(purchasePrice)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+              </div>
+            )}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={addAsset.isPending}>

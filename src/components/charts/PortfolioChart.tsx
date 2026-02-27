@@ -1,23 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts";
 import type { OHLCVRow } from "@/types";
 import { Button } from "@/components/ui/button";
 import { daysAgo } from "@/lib/utils/dateHelpers";
 import type { UTCTimestamp, AreaData } from "lightweight-charts";
 
+export type TimeRange = "7d" | "30d" | "90d" | "1y" | "5y" | "all";
+
 interface Props {
   allPrices: Map<string, OHLCVRow[]>;
   holdings: Map<string, number>;
   height?: number;
+  timeRange: TimeRange;
+  onTimeRangeChange: (range: TimeRange) => void;
 }
-
-type TimeRange = "7d" | "30d" | "90d" | "1y" | "all";
 
 const ranges: { label: string; value: TimeRange }[] = [
   { label: "7D", value: "7d" },
   { label: "30D", value: "30d" },
   { label: "90D", value: "90d" },
   { label: "1Y", value: "1y" },
+  { label: "5Y", value: "5y" },
   { label: "All", value: "all" },
 ];
 
@@ -27,14 +30,14 @@ function getRangeStart(range: TimeRange): number {
     case "30d": return daysAgo(30);
     case "90d": return daysAgo(90);
     case "1y": return daysAgo(365);
+    case "5y": return daysAgo(365 * 5);
     case "all": return 0;
   }
 }
 
-export function PortfolioChart({ allPrices, holdings, height = 300 }: Props) {
+export function PortfolioChart({ allPrices, holdings, height = 300, timeRange, onTimeRangeChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>("30d");
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -141,7 +144,7 @@ export function PortfolioChart({ allPrices, holdings, height = 300 }: Props) {
             key={r.value}
             variant={timeRange === r.value ? "default" : "ghost"}
             size="sm"
-            onClick={() => setTimeRange(r.value)}
+            onClick={() => onTimeRangeChange(r.value)}
           >
             {r.label}
           </Button>

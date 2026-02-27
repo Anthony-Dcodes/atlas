@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listAssets, addAsset, removeAsset } from "@/lib/tauri/assets";
+import { listAssets, addAsset, removeAsset, listAllAssets, purgeAsset } from "@/lib/tauri/assets";
 import type { AssetType } from "@/types";
 
 export function useAssets() {
@@ -32,6 +32,26 @@ export function useRemoveAsset() {
   return useMutation({
     mutationFn: (id: string) => removeAsset(id),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["allAssets"] });
+      queryClient.invalidateQueries({ queryKey: ["prices"] });
+    },
+  });
+}
+
+export function useAllAssets() {
+  return useQuery({
+    queryKey: ["allAssets"],
+    queryFn: listAllAssets,
+  });
+}
+
+export function usePurgeAsset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => purgeAsset(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allAssets"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["prices"] });
     },

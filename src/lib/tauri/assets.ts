@@ -20,3 +20,11 @@ export async function addAsset(
 export async function removeAsset(id: string): Promise<void> {
   return invoke<void>("remove_asset", { id });
 }
+
+export async function listAllAssets(): Promise<Asset[]> {
+  return invoke<Asset[]>("list_all_assets");
+}
+
+export async function purgeAsset(id: string): Promise<void> {
+  return invoke<void>("purge_asset", { id });
+}

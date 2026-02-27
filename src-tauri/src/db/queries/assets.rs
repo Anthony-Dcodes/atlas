@@ -49,6 +49,36 @@ pub fn list_assets(conn: &Connection) -> anyhow::Result<Vec<Asset>> {
     Ok(assets)
 }
 
+pub fn list_all_assets(conn: &Connection) -> anyhow::Result<Vec<Asset>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, symbol, name, asset_type, currency, added_at, deleted_at FROM assets ORDER BY added_at DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(Asset {
+            id: row.get(0)?,
+            symbol: row.get(1)?,
+            name: row.get(2)?,
+            asset_type: AssetType::from_str(&row.get::<_, String>(3)?).unwrap_or(AssetType::Stock),
+            currency: row.get(4)?,
+            added_at: row.get(5)?,
+            deleted_at: row.get(6)?,
+        })
+    })?;
+    let mut assets = Vec::new();
+    for row in rows {
+        assets.push(row?);
+    }
+    Ok(assets)
+}
+
+pub fn hard_delete_asset(conn: &Connection, id: &str) -> anyhow::Result<()> {
+    let deleted = conn.execute("DELETE FROM assets WHERE id = ?1", params![id])?;
+    if deleted == 0 {
+        anyhow::bail!("Asset not found");
+    }
+    Ok(())
+}
+
 pub fn get_asset(conn: &Connection, id: &str) -> anyhow::Result<Option<Asset>> {
     let mut stmt = conn.prepare(
         "SELECT id, symbol, name, asset_type, currency, added_at, deleted_at FROM assets WHERE id = ?1 AND deleted_at IS NULL",

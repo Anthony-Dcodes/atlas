@@ -89,6 +89,15 @@ pub fn update_transaction(
     Ok(())
 }
 
+pub fn soft_delete_transactions_by_asset(conn: &Connection, asset_id: &str) -> anyhow::Result<u64> {
+    let now = Utc::now().timestamp();
+    let count = conn.execute(
+        "UPDATE transactions SET deleted_at = ?1 WHERE asset_id = ?2 AND deleted_at IS NULL",
+        params![now, asset_id],
+    )?;
+    Ok(count as u64)
+}
+
 pub fn get_holding_summary(
     conn: &Connection,
     asset_id: &str,
@@ -226,6 +235,25 @@ mod tests {
         let conn = test_db();
         let result = update_transaction(&conn, "nonexistent-id", &TxType::Buy, 1.0, 50000.0, 1700000000, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_soft_delete_transactions_by_asset() {
+        let conn = test_db();
+        let asset_id = setup_test_asset(&conn);
+
+        insert_transaction(&conn, &asset_id, &TxType::Buy, 1.0, 40000.0, 1700000000, None).unwrap();
+        insert_transaction(&conn, &asset_id, &TxType::Buy, 0.5, 45000.0, 1700100000, None).unwrap();
+
+        let count = soft_delete_transactions_by_asset(&conn, &asset_id).unwrap();
+        assert_eq!(count, 2);
+
+        let txs = list_transactions_by_asset(&conn, &asset_id).unwrap();
+        assert_eq!(txs.len(), 0);
+
+        // Calling again should return 0 (already deleted)
+        let count2 = soft_delete_transactions_by_asset(&conn, &asset_id).unwrap();
+        assert_eq!(count2, 0);
     }
 
     #[test]

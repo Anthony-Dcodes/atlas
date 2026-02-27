@@ -20,7 +20,7 @@ import type { OHLCVRow, AssetHoldingSummary } from "@/types";
 
 export function Dashboard() {
   const { data: assets, isLoading } = useAssets();
-  const { selectedAssetId, setSelectedAssetId } = useAssetsStore();
+  const { selectedAssetId, setSelectedAssetId, portfolioTimeRange, setPortfolioTimeRange } = useAssetsStore();
 
   const selectedAsset = assets?.find((a) => a.id === selectedAssetId);
 
@@ -199,7 +199,7 @@ export function Dashboard() {
               totalUnrealizedPnL={derived.totalUnrealizedPnL}
               totalPnLPct={derived.totalPnLPct}
             />
-            <PortfolioChart allPrices={derived.allPrices} holdings={derived.holdings} height={260} />
+            <PortfolioChart allPrices={derived.allPrices} holdings={derived.holdings} height={260} timeRange={portfolioTimeRange} onTimeRangeChange={setPortfolioTimeRange} />
           </div>
 
           {/* Section B: Allocation bar */}

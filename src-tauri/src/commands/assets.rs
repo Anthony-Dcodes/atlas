@@ -39,7 +39,11 @@ pub fn add_asset(
 #[tauri::command]
 pub fn remove_asset(id: String, state: State<'_, AppState>) -> Result<(), String> {
     state
-        .with_db(|conn| queries::assets::soft_delete_asset(conn, &id))
+        .with_db(|conn| {
+            queries::assets::soft_delete_asset(conn, &id)?;
+            queries::transactions::soft_delete_transactions_by_asset(conn, &id)?;
+            Ok(())
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -47,5 +51,19 @@ pub fn remove_asset(id: String, state: State<'_, AppState>) -> Result<(), String
 pub fn list_assets(state: State<'_, AppState>) -> Result<Vec<Asset>, String> {
     state
         .with_db(queries::assets::list_assets)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_all_assets(state: State<'_, AppState>) -> Result<Vec<Asset>, String> {
+    state
+        .with_db(queries::assets::list_all_assets)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn purge_asset(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .with_db(|conn| queries::assets::hard_delete_asset(conn, &id))
         .map_err(|e| e.to_string())
 }
