@@ -57,26 +57,23 @@ impl MarketDataProvider for TwelveDataProvider {
             .format("%Y-%m-%d")
             .to_string();
 
-        // On first fetch (from=0), omit start_date and rely on outputsize=5000
-        // to get max available history (~20 years of daily data)
-        let is_first_fetch = range.from == 0;
+        // On first fetch (from=0), use 1990-01-01 as start_date to get max history.
+        // TwelveData requires an explicit start_date to return more than ~1 year.
+        let start_ts = if range.from == 0 { 631152000 } else { range.from };
+        let start = DateTime::from_timestamp(start_ts, 0)
+            .ok_or_else(|| anyhow::anyhow!("Invalid start timestamp"))?
+            .format("%Y-%m-%d")
+            .to_string();
 
-        let mut params = vec![
+        let params = vec![
             ("symbol", symbol.to_string()),
             ("interval", "1day".to_string()),
+            ("start_date", start),
             ("end_date", end),
             ("apikey", self.api_key.clone()),
             ("format", "JSON".to_string()),
             ("outputsize", "5000".to_string()),
         ];
-
-        if !is_first_fetch {
-            let start = DateTime::from_timestamp(range.from, 0)
-                .ok_or_else(|| anyhow::anyhow!("Invalid start timestamp"))?
-                .format("%Y-%m-%d")
-                .to_string();
-            params.push(("start_date", start));
-        }
 
         let resp: TimeSeriesResponse = self
             .client
