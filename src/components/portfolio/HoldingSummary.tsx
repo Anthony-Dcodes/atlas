@@ -9,19 +9,51 @@ interface Props {
 export function HoldingSummary({ assetId, currentPrice }: Props) {
   const { data: summary, isLoading } = useHoldingSummary(assetId);
 
-  if (isLoading || !summary || summary.total_bought === 0) {
+  if (isLoading || !summary || (summary.total_bought === 0 && summary.total_sold === 0)) {
     return null;
   }
 
+  const isShort = summary.total_bought === 0;
   const currentValue = summary.net_quantity * currentPrice;
-  const unrealizedPnL = currentValue - summary.total_cost_basis + (summary.total_sold * summary.avg_cost_per_unit);
-  const pnlPercent =
-    summary.total_cost_basis > 0
-      ? (unrealizedPnL / summary.total_cost_basis) * 100
-      : 0;
+  const pnl = currentValue + summary.total_sold_value - summary.total_cost_basis;
+  const pnlBasis = summary.total_cost_basis > 0 ? summary.total_cost_basis : summary.total_sold_value;
+  const pnlPercent = pnlBasis > 0 ? (pnl / pnlBasis) * 100 : 0;
+  const currentlyInvested = summary.net_quantity * summary.avg_cost_per_unit;
 
+  if (isShort) {
+    // Pure short: Net Qty | Avg Entry | Short Proceeds | Current Value | P&L
+    const avgEntry = summary.total_sold > 0 ? summary.total_sold_value / summary.total_sold : 0;
+    return (
+      <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card/50 p-4 sm:grid-cols-5">
+        <div>
+          <p className="text-xs text-muted-foreground">Net Quantity</p>
+          <p className="text-sm font-medium">{summary.net_quantity.toFixed(6)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Avg Entry</p>
+          <p className="text-sm font-medium">{formatCurrency(avgEntry)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Short Proceeds</p>
+          <p className="text-sm font-medium">{formatCurrency(summary.total_sold_value)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Current Value</p>
+          <p className="text-sm font-medium">{formatCurrency(currentValue)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">P&L</p>
+          <p className={`text-sm font-medium ${pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+            {formatCurrency(pnl)} ({pnl >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%)
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Long / mixed: Net Qty | Avg Cost | Total Invested | Currently Invested | Current Value | P&L
   return (
-    <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card/50 p-4 sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card/50 p-4 sm:grid-cols-3 lg:grid-cols-6">
       <div>
         <p className="text-xs text-muted-foreground">Net Quantity</p>
         <p className="text-sm font-medium">{summary.net_quantity.toFixed(6)}</p>
@@ -35,13 +67,17 @@ export function HoldingSummary({ assetId, currentPrice }: Props) {
         <p className="text-sm font-medium">{formatCurrency(summary.total_cost_basis)}</p>
       </div>
       <div>
+        <p className="text-xs text-muted-foreground">Currently Invested</p>
+        <p className="text-sm font-medium">{formatCurrency(currentlyInvested)}</p>
+      </div>
+      <div>
         <p className="text-xs text-muted-foreground">Current Value</p>
         <p className="text-sm font-medium">{formatCurrency(currentValue)}</p>
       </div>
       <div>
-        <p className="text-xs text-muted-foreground">Unrealized P&L</p>
-        <p className={`text-sm font-medium ${unrealizedPnL >= 0 ? "text-green-500" : "text-red-500"}`}>
-          {formatCurrency(unrealizedPnL)} ({unrealizedPnL >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%)
+        <p className="text-xs text-muted-foreground">P&L</p>
+        <p className={`text-sm font-medium ${pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+          {formatCurrency(pnl)} ({pnl >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%)
         </p>
       </div>
     </div>
