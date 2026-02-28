@@ -151,14 +151,8 @@ pub fn get_holding_summary(
             params![asset_id],
             |row| row.get(0),
         )?;
-    let snapshot_quantity: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(quantity), 0) FROM transactions WHERE asset_id = ?1 AND tx_type = 'snapshot' AND deleted_at IS NULL",
-            params![asset_id],
-            |row| row.get(0),
-        )?;
 
-    let net_quantity = snapshot_quantity + total_bought - total_sold;
+    let net_quantity = total_bought - total_sold;
     let avg_cost_per_unit = if total_bought > 0.0 {
         total_cost_basis / total_bought
     } else {
@@ -169,7 +163,6 @@ pub fn get_holding_summary(
         total_bought,
         total_sold,
         total_sold_value,
-        snapshot_quantity,
         net_quantity,
         total_cost_basis,
         avg_cost_per_unit,
@@ -238,8 +231,6 @@ mod tests {
         assert_eq!(summary.total_cost_basis, 160000.0);
         // total_sold_value: 0.5*55000 = 27500
         assert_eq!(summary.total_sold_value, 27500.0);
-        // no snapshots
-        assert_eq!(summary.snapshot_quantity, 0.0);
         // avg cost: 160000 / 3 = 53333.33...
         assert!((summary.avg_cost_per_unit - 53333.333333).abs() < 0.01);
     }

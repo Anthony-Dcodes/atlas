@@ -62,19 +62,19 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
         conn.execute("ALTER TABLE transactions ADD COLUMN locked_at INTEGER", [])?;
     }
 
-    // Idempotent table migration: add 'snapshot' to tx_type CHECK constraint
+    // Reverse migration: remove 'snapshot' tx_type, convert existing snapshots to 'buy'
     let table_sql: String = conn.query_row(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='transactions'",
         [],
         |row| row.get(0),
     ).unwrap_or_default();
-    if !table_sql.contains("'snapshot'") {
+    if table_sql.contains("'snapshot'") {
         conn.execute_batch("
             PRAGMA foreign_keys = OFF;
             CREATE TABLE transactions_v2 (
                 id          TEXT PRIMARY KEY,
                 asset_id    TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-                tx_type     TEXT NOT NULL CHECK(tx_type IN ('buy','sell','snapshot')),
+                tx_type     TEXT NOT NULL CHECK(tx_type IN ('buy','sell')),
                 quantity    REAL NOT NULL,
                 price_usd   REAL NOT NULL DEFAULT 0,
                 ts          INTEGER NOT NULL,
@@ -83,7 +83,11 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
                 deleted_at  INTEGER,
                 locked_at   INTEGER
             );
-            INSERT INTO transactions_v2 SELECT * FROM transactions;
+            INSERT INTO transactions_v2
+                SELECT id, asset_id,
+                    CASE WHEN tx_type = 'snapshot' THEN 'buy' ELSE tx_type END,
+                    quantity, price_usd, ts, notes, created_at, deleted_at, locked_at
+                FROM transactions;
             DROP TABLE transactions;
             ALTER TABLE transactions_v2 RENAME TO transactions;
             PRAGMA foreign_keys = ON;

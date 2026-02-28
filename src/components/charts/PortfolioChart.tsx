@@ -18,7 +18,7 @@ interface Props {
 function getQtyAtTime(txs: Transaction[], ts: number): number {
   return txs.reduce((qty, tx) => {
     if (tx.ts <= ts) {
-      return (tx.tx_type === "buy" || tx.tx_type === "snapshot")
+      return tx.tx_type === "buy"
         ? qty + tx.quantity
         : qty - tx.quantity;
     }

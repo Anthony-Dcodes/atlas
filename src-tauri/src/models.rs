@@ -68,7 +68,6 @@ pub struct DateRange {
 pub enum TxType {
     Buy,
     Sell,
-    Snapshot,
 }
 
 impl TxType {
@@ -76,7 +75,6 @@ impl TxType {
         match self {
             TxType::Buy => "buy",
             TxType::Sell => "sell",
-            TxType::Snapshot => "snapshot",
         }
     }
 
@@ -84,7 +82,6 @@ impl TxType {
         match s {
             "buy" => Ok(TxType::Buy),
             "sell" => Ok(TxType::Sell),
-            "snapshot" => Ok(TxType::Snapshot),
             _ => anyhow::bail!("Invalid transaction type: {}", s),
         }
     }
@@ -118,7 +115,6 @@ pub struct AssetHoldingSummary {
     pub total_bought: f64,
     pub total_sold: f64,
     pub total_sold_value: f64,
-    pub snapshot_quantity: f64,
     pub net_quantity: f64,
     pub total_cost_basis: f64,
     pub avg_cost_per_unit: f64,

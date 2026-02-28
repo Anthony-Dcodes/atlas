@@ -84,7 +84,7 @@ export function Dashboard() {
         const pnl = currentValue + holding.total_sold_value - holding.total_cost_basis;
         totalCostBasis += holding.total_cost_basis;
         totalSoldValue += holding.total_sold_value;
-        if (holding.snapshot_quantity === 0) totalUnrealizedPnL += pnl;
+        totalUnrealizedPnL += pnl;
       }
 
       return { asset, sorted, latestPrice, holding, isHeld };
@@ -106,11 +106,9 @@ export function Dashboard() {
       if (isHeld && holding && latestPrice !== null) {
         netQty = holding.net_quantity;
         assetValue = holding.net_quantity * latestPrice;
-        if (holding.snapshot_quantity === 0) {
-          unrealizedPnL = assetValue + holding.total_sold_value - holding.total_cost_basis;
-          const pnlBasis = holding.total_cost_basis > 0 ? holding.total_cost_basis : holding.total_sold_value;
-          pnlPct = pnlBasis > 0 ? (unrealizedPnL / pnlBasis) * 100 : 0;
-        }
+        unrealizedPnL = assetValue + holding.total_sold_value - holding.total_cost_basis;
+        const pnlBasis = holding.total_cost_basis > 0 ? holding.total_cost_basis : holding.total_sold_value;
+        pnlPct = pnlBasis > 0 ? (unrealizedPnL / pnlBasis) * 100 : 0;
       } else if (isHeld && holding) {
         netQty = holding.net_quantity;
       }

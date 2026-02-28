@@ -118,19 +118,15 @@ export function TransactionsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <Badge
-                      variant={tx.tx_type === "buy" ? "default" : tx.tx_type === "sell" ? "destructive" : "outline"}
-                      className={tx.tx_type === "buy" ? "bg-green-600" : tx.tx_type === "snapshot" ? "text-zinc-400" : ""}
+                      variant={tx.tx_type === "buy" ? "default" : "destructive"}
+                      className={tx.tx_type === "buy" ? "bg-green-600" : ""}
                     >
-                      {tx.tx_type === "buy" ? "BUY" : tx.tx_type === "sell" ? "SELL" : "BALANCE"}
+                      {tx.tx_type === "buy" ? "BUY" : "SELL"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right text-zinc-300">{tx.quantity}</td>
-                  <td className="px-4 py-3 text-right text-zinc-300">
-                    {tx.tx_type === "snapshot" ? <span className="text-zinc-500">—</span> : formatCurrency(tx.price_usd)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-zinc-100">
-                    {tx.tx_type === "snapshot" ? <span className="text-zinc-500">—</span> : formatCurrency(tx.quantity * tx.price_usd)}
-                  </td>
+                  <td className="px-4 py-3 text-right text-zinc-300">{formatCurrency(tx.price_usd)}</td>
+                  <td className="px-4 py-3 text-right font-medium text-zinc-100">{formatCurrency(tx.quantity * tx.price_usd)}</td>
                   <td className="px-4 py-3 text-right">
                     {unlockingTxId === tx.id ? (
                       <div className="flex items-center justify-end gap-1">
@@ -171,8 +167,7 @@ export function TransactionsPage() {
                         <Button variant="ghost" size="sm" onClick={() => setEditingTx(tx)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
-                        {tx.tx_type !== "snapshot" && (
-                          <Button
+                        <Button
                             variant="ghost"
                             size="sm"
                             title={tx.locked_at !== null ? "Locked — click to unlock" : "Lock transaction"}
@@ -188,7 +183,6 @@ export function TransactionsPage() {
                           >
                             {tx.locked_at !== null ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
                           </Button>
-                        )}
                         <Button
                           variant="ghost"
                           size="sm"
