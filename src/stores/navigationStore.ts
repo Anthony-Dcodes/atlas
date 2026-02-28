@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type Page = "dashboard" | "transactions" | "asset-manager" | "settings";
+export type Page = "dashboard" | "transactions" | "realized-pnl" | "asset-manager" | "settings";
 
 interface NavigationState {
   activePage: Page;
