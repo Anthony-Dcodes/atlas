@@ -11,6 +11,6 @@ interface AssetsState {
 export const useAssetsStore = create<AssetsState>((set) => ({
   selectedAssetId: null,
   setSelectedAssetId: (id) => set({ selectedAssetId: id }),
-  portfolioTimeRange: "30d",
+  portfolioTimeRange: "1y",
   setPortfolioTimeRange: (range) => set({ portfolioTimeRange: range }),
 }));
