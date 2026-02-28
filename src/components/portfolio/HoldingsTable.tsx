@@ -61,9 +61,22 @@ export function HoldingsTable({ rows, onSelect }: Props) {
               onClick={() => onSelect(row.asset.id)}
             >
               <td className="px-4 py-4">
-                <div className="flex items-center gap-2">
-                  <span style={{ color: row.color }}>●</span>
-                  <span className="font-semibold text-zinc-100">{row.asset.symbol}</span>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: row.color }}>●</span>
+                    <span className="font-semibold text-zinc-100">{row.asset.symbol}</span>
+                  </div>
+                  {row.isHeld && row.netQty !== 0 && (
+                    row.netQty > 0 ? (
+                      <span className="w-fit rounded px-1.5 py-0.5 text-[10px] font-semibold border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+                        LONG
+                      </span>
+                    ) : (
+                      <span className="w-fit rounded px-1.5 py-0.5 text-[10px] font-semibold border border-red-500/40 bg-red-500/10 text-red-400">
+                        SHORT
+                      </span>
+                    )
+                  )}
                 </div>
               </td>
               <td className="px-3 py-4 max-w-[160px]">
