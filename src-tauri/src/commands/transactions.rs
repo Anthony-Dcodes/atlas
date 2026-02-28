@@ -76,6 +76,26 @@ pub fn delete_transaction(
 }
 
 #[tauri::command]
+pub fn lock_transaction(
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .with_db(|conn| queries::transactions::lock_transaction(conn, &id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn unlock_transaction(
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .with_db(|conn| queries::transactions::unlock_transaction(conn, &id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_holding_summary(
     asset_id: String,
     state: State<'_, AppState>,

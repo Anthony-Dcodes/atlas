@@ -28,6 +28,7 @@ pub fn insert_transaction(
         notes: notes.map(|s| s.to_string()),
         created_at: now,
         deleted_at: None,
+        locked_at: None,
     })
 }
 
@@ -36,7 +37,7 @@ pub fn list_transactions_by_asset(
     asset_id: &str,
 ) -> anyhow::Result<Vec<Transaction>> {
     let mut stmt = conn.prepare(
-        "SELECT id, asset_id, tx_type, quantity, price_usd, ts, notes, created_at, deleted_at FROM transactions WHERE asset_id = ?1 AND deleted_at IS NULL ORDER BY ts DESC",
+        "SELECT id, asset_id, tx_type, quantity, price_usd, ts, notes, created_at, deleted_at, locked_at FROM transactions WHERE asset_id = ?1 AND deleted_at IS NULL ORDER BY ts DESC",
     )?;
     let rows = stmt.query_map(params![asset_id], |row| {
         Ok(Transaction {
@@ -49,6 +50,7 @@ pub fn list_transactions_by_asset(
             notes: row.get(6)?,
             created_at: row.get(7)?,
             deleted_at: row.get(8)?,
+            locked_at: row.get(9)?,
         })
     })?;
     let mut transactions = Vec::new();
@@ -96,6 +98,29 @@ pub fn soft_delete_transactions_by_asset(conn: &Connection, asset_id: &str) -> a
         params![now, asset_id],
     )?;
     Ok(count as u64)
+}
+
+pub fn lock_transaction(conn: &Connection, id: &str) -> anyhow::Result<()> {
+    let now = Utc::now().timestamp();
+    let updated = conn.execute(
+        "UPDATE transactions SET locked_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, id],
+    )?;
+    if updated == 0 {
+        anyhow::bail!("Transaction not found");
+    }
+    Ok(())
+}
+
+pub fn unlock_transaction(conn: &Connection, id: &str) -> anyhow::Result<()> {
+    let updated = conn.execute(
+        "UPDATE transactions SET locked_at = NULL WHERE id = ?1 AND deleted_at IS NULL",
+        params![id],
+    )?;
+    if updated == 0 {
+        anyhow::bail!("Transaction not found");
+    }
+    Ok(())
 }
 
 pub fn get_holding_summary(

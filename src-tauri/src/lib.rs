@@ -42,6 +42,8 @@ pub fn run() {
             commands::transactions::list_transactions,
             commands::transactions::update_transaction,
             commands::transactions::delete_transaction,
+            commands::transactions::lock_transaction,
+            commands::transactions::unlock_transaction,
             commands::transactions::get_holding_summary,
             commands::search::search_symbols,
         ])

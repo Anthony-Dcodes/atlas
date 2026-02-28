@@ -4,11 +4,11 @@ import { useAssets } from "@/hooks/useAssets";
 import { AddTransactionDialog } from "@/components/portfolio/AddTransactionDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { listTransactions, deleteTransaction } from "@/lib/tauri/transactions";
+import { listTransactions, deleteTransaction, lockTransaction, unlockTransaction } from "@/lib/tauri/transactions";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 import { formatDate } from "@/lib/utils/dateHelpers";
 import type { Asset, Transaction } from "@/types";
-import { Pencil, Trash2 } from "lucide-react";
+import { Lock, LockOpen, Pencil, Trash2 } from "lucide-react";
 
 interface TxWithAsset extends Transaction {
   asset: Asset;
@@ -18,6 +18,8 @@ export function TransactionsPage() {
   const { data: assets, isLoading: assetsLoading } = useAssets();
   const queryClient = useQueryClient();
   const [editingTx, setEditingTx] = useState<TxWithAsset | null>(null);
+  const [unlockingTxId, setUnlockingTxId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const txResults = useQueries({
     queries: (assets ?? []).map((asset) => ({
@@ -31,6 +33,21 @@ export function TransactionsPage() {
     onSuccess: (_, { assetId }) => {
       queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
       queryClient.invalidateQueries({ queryKey: ["holdingSummary", assetId] });
+    },
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: ({ id }: { id: string; assetId: string }) => lockTransaction(id),
+    onSuccess: (_, { assetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
+    },
+  });
+
+  const unlockMutation = useMutation({
+    mutationFn: ({ id }: { id: string; assetId: string }) => unlockTransaction(id),
+    onSuccess: (_, { assetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
+      setUnlockingTxId(null);
     },
   });
 
@@ -115,23 +132,77 @@ export function TransactionsPage() {
                     {formatCurrency(tx.quantity * tx.price_usd)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingTx(tx)}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate({ id: tx.id, assetId: tx.asset.id })}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {unlockingTxId === tx.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-amber-400">Unlock?</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => unlockMutation.mutate({ id: tx.id, assetId: tx.asset.id })}
+                          disabled={unlockMutation.isPending}
+                        >
+                          Yes
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setUnlockingTxId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : confirmDeleteId === tx.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-red-400">Delete locked?</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-300"
+                          onClick={() => {
+                            deleteMutation.mutate({ id: tx.id, assetId: tx.asset.id });
+                            setConfirmDeleteId(null);
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          Delete
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setEditingTx(tx)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title={tx.locked_at !== null ? "Locked — click to unlock" : "Lock transaction"}
+                          className={tx.locked_at !== null ? "text-amber-400 hover:text-amber-300" : "text-zinc-500 hover:text-zinc-300"}
+                          onClick={() => {
+                            if (tx.locked_at !== null) {
+                              setUnlockingTxId(tx.id);
+                            } else {
+                              lockMutation.mutate({ id: tx.id, assetId: tx.asset.id });
+                            }
+                          }}
+                          disabled={lockMutation.isPending}
+                        >
+                          {tx.locked_at !== null ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (tx.locked_at !== null) {
+                              setConfirmDeleteId(tx.id);
+                            } else {
+                              deleteMutation.mutate({ id: tx.id, assetId: tx.asset.id });
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

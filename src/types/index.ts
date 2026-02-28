@@ -39,6 +39,7 @@ export interface Transaction {
   notes: string | null;
   created_at: number;
   deleted_at: number | null;
+  locked_at: number | null;
 }
 
 export interface SymbolSearchResult {

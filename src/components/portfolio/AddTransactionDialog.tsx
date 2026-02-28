@@ -168,6 +168,11 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
           <DialogTitle>{isEdit ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isEdit && transaction.locked_at !== null && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+              This transaction is locked. Changes will affect your portfolio history.
+            </div>
+          )}
           {!isEdit && !assetId && (
             <div className="space-y-2">
               <Label>Asset</Label>
@@ -339,7 +344,11 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending
               ? (isEdit ? "Saving..." : "Adding...")
-              : (isEdit ? "Save Changes" : "Add Transaction")}
+              : isEdit && transaction.locked_at !== null
+              ? "Override & Save"
+              : isEdit
+              ? "Save Changes"
+              : "Add Transaction"}
           </Button>
         </form>
       </DialogContent>

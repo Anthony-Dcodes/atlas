@@ -46,9 +46,21 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
             ts          INTEGER NOT NULL,
             notes       TEXT,
             created_at  INTEGER NOT NULL,
-            deleted_at  INTEGER
+            deleted_at  INTEGER,
+            locked_at   INTEGER
         );
         ",
     )?;
+
+    // Idempotent column migration: add locked_at to existing databases
+    let has_locked: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name='locked_at'",
+        [],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0) > 0;
+    if !has_locked {
+        conn.execute("ALTER TABLE transactions ADD COLUMN locked_at INTEGER", [])?;
+    }
+
     Ok(())
 }

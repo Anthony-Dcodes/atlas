@@ -4,6 +4,8 @@ import {
   addTransaction,
   updateTransaction,
   deleteTransaction,
+  lockTransaction,
+  unlockTransaction,
   getHoldingSummary,
 } from "@/lib/tauri/transactions";
 import type { TxType } from "@/types";
@@ -80,6 +82,26 @@ export function useDeleteTransaction(assetId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
       queryClient.invalidateQueries({ queryKey: ["holdingSummary", assetId] });
+    },
+  });
+}
+
+export function useLockTransaction(assetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => lockTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
+    },
+  });
+}
+
+export function useUnlockTransaction(assetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unlockTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions", assetId] });
     },
   });
 }

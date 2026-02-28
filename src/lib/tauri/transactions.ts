@@ -47,6 +47,14 @@ export async function deleteTransaction(id: string): Promise<void> {
   return invoke<void>("delete_transaction", { id });
 }
 
+export async function lockTransaction(id: string): Promise<void> {
+  return invoke<void>("lock_transaction", { id });
+}
+
+export async function unlockTransaction(id: string): Promise<void> {
+  return invoke<void>("unlock_transaction", { id });
+}
+
 export async function getHoldingSummary(
   assetId: string,
 ): Promise<AssetHoldingSummary> {

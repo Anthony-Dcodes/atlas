@@ -98,6 +98,7 @@ pub struct Transaction {
     pub notes: Option<String>,
     pub created_at: i64,
     pub deleted_at: Option<i64>,
+    pub locked_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
