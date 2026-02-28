@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts";
-import type { OHLCVRow } from "@/types";
+import type { OHLCVRow, Transaction } from "@/types";
 import { Button } from "@/components/ui/button";
 import { daysAgo } from "@/lib/utils/dateHelpers";
 import type { UTCTimestamp, AreaData } from "lightweight-charts";
@@ -9,10 +9,19 @@ export type TimeRange = "7d" | "30d" | "90d" | "1y" | "5y" | "all";
 
 interface Props {
   allPrices: Map<string, OHLCVRow[]>;
-  holdings: Map<string, number>;
+  transactions: Map<string, Transaction[]>;
   height?: number;
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
+}
+
+function getQtyAtTime(txs: Transaction[], ts: number): number {
+  return txs.reduce((qty, tx) => {
+    if (tx.ts <= ts) {
+      return tx.tx_type === "buy" ? qty + tx.quantity : qty - tx.quantity;
+    }
+    return qty;
+  }, 0);
 }
 
 const ranges: { label: string; value: TimeRange }[] = [
@@ -35,7 +44,7 @@ function getRangeStart(range: TimeRange): number {
   }
 }
 
-export function PortfolioChart({ allPrices, holdings, height = 300, timeRange, onTimeRangeChange }: Props) {
+export function PortfolioChart({ allPrices, transactions, height = 300, timeRange, onTimeRangeChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -66,16 +75,16 @@ export function PortfolioChart({ allPrices, holdings, height = 300, timeRange, o
     // Aggregate portfolio value with forward-fill for missing days (e.g. weekends)
     const rangeStart = getRangeStart(timeRange);
 
-    // Collect per-asset sorted price arrays for held assets only
-    const assetArrays: { qty: number; prices: OHLCVRow[] }[] = [];
+    // Collect per-asset sorted price arrays for assets with transactions
+    const assetArrays: { txs: Transaction[]; prices: OHLCVRow[] }[] = [];
     const allTimestamps = new Set<number>();
 
     for (const [assetId, rows] of allPrices.entries()) {
-      const qty = holdings.get(assetId);
-      if (qty === undefined || qty <= 0) continue;
+      const txs = transactions.get(assetId);
+      if (!txs || txs.length === 0) continue;
       const filtered = rows.filter((r) => r.ts >= rangeStart).sort((a, b) => a.ts - b.ts);
       if (filtered.length === 0) continue;
-      assetArrays.push({ qty, prices: filtered });
+      assetArrays.push({ txs, prices: filtered });
       for (const r of filtered) allTimestamps.add(r.ts);
     }
 
@@ -100,7 +109,9 @@ export function PortfolioChart({ allPrices, holdings, height = 300, timeRange, o
     const chartData: AreaData<UTCTimestamp>[] = sortedTimestamps.flatMap((ts) => {
       let total = 0;
       let hasAny = false;
-      for (const { qty, prices } of assetArrays) {
+      for (const { txs, prices } of assetArrays) {
+        const qty = getQtyAtTime(txs, ts);
+        if (qty <= 0) continue;
         const close = getLastKnownClose(prices, ts);
         if (close !== null) {
           total += qty * close;
@@ -134,7 +145,7 @@ export function PortfolioChart({ allPrices, holdings, height = 300, timeRange, o
       chart.remove();
       chartRef.current = null;
     };
-  }, [allPrices, holdings, height, timeRange]);
+  }, [allPrices, transactions, height, timeRange]);
 
   return (
     <div>

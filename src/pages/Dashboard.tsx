@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useAssets } from "@/hooks/useAssets";
 import { useAssetsStore } from "@/stores/assetsStore";
@@ -12,11 +12,11 @@ import { PortfolioHeader } from "@/components/portfolio/PortfolioHeader";
 import { AllocationBar } from "@/components/portfolio/AllocationBar";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
 import { fetchPrices } from "@/lib/tauri/prices";
-import { getHoldingSummary } from "@/lib/tauri/transactions";
+import { getHoldingSummary, listTransactions } from "@/lib/tauri/transactions";
 import { buildColorMap } from "@/lib/utils/assetColors";
 import { calcChange } from "@/lib/utils/priceUtils";
 import { daysAgo } from "@/lib/utils/dateHelpers";
-import type { OHLCVRow, AssetHoldingSummary } from "@/types";
+import type { OHLCVRow, AssetHoldingSummary, Transaction } from "@/types";
 
 export function Dashboard() {
   const { data: assets, isLoading } = useAssets();
@@ -25,12 +25,6 @@ export function Dashboard() {
   const selectedAsset = assets?.find((a) => a.id === selectedAssetId);
 
   const [txDialogOpen, setTxDialogOpen] = useState(false);
-  const [txAssetId, setTxAssetId] = useState<string | undefined>(undefined);
-
-  const handleAddTransaction = useCallback((assetId?: string) => {
-    setTxAssetId(assetId);
-    setTxDialogOpen(true);
-  }, []);
 
   const priceResults = useQueries({
     queries: (assets ?? []).map((asset) => ({
@@ -43,6 +37,13 @@ export function Dashboard() {
     queries: (assets ?? []).map((asset) => ({
       queryKey: ["holdingSummary", asset.id] as const,
       queryFn: (): Promise<AssetHoldingSummary> => getHoldingSummary(asset.id),
+    })),
+  });
+
+  const transactionResults = useQueries({
+    queries: (assets ?? []).map((asset) => ({
+      queryKey: ["transactions", asset.id] as const,
+      queryFn: (): Promise<Transaction[]> => listTransactions(asset.id),
     })),
   });
 
@@ -146,19 +147,20 @@ export function Dashboard() {
         color: row.color,
       }));
 
-    const holdings = new Map<string, number>();
-    for (const ap of assetPrices) {
-      if (ap.isHeld && ap.holding) {
-        holdings.set(ap.asset.id, ap.holding.net_quantity);
+    const allTransactions = new Map<string, Transaction[]>();
+    assets.forEach((asset, i) => {
+      const txs = transactionResults[i]?.data;
+      if (txs && txs.length > 0) {
+        allTransactions.set(asset.id, txs);
       }
-    }
+    });
 
     return {
       totalValue, change24hValue, change24hPct,
       totalUnrealizedPnL, totalPnLPct,
-      allPrices, holdings, holdingRows, segments,
+      allPrices, allTransactions, holdingRows, segments,
     };
-  }, [assets, priceResults, holdingResults]);
+  }, [assets, priceResults, holdingResults, transactionResults]);
 
   if (selectedAsset) {
     return <AssetDetail asset={selectedAsset} />;
@@ -168,13 +170,7 @@ export function Dashboard() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-zinc-100">Portfolio Overview</h2>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => handleAddTransaction()}>
-            <Plus className="mr-1 h-4 w-4" />
-            Add Transaction
-          </Button>
-          <AddAssetDialog />
-        </div>
+        <AddAssetDialog />
       </div>
 
       {isLoading && <p className="text-muted-foreground">Loading assets...</p>}
@@ -199,7 +195,7 @@ export function Dashboard() {
               totalUnrealizedPnL={derived.totalUnrealizedPnL}
               totalPnLPct={derived.totalPnLPct}
             />
-            <PortfolioChart allPrices={derived.allPrices} holdings={derived.holdings} height={260} timeRange={portfolioTimeRange} onTimeRangeChange={setPortfolioTimeRange} />
+            <PortfolioChart allPrices={derived.allPrices} transactions={derived.allTransactions} height={260} timeRange={portfolioTimeRange} onTimeRangeChange={setPortfolioTimeRange} />
           </div>
 
           {/* Section B: Allocation bar */}
@@ -214,14 +210,21 @@ export function Dashboard() {
 
           {/* Section C: Holdings table */}
           {derived.holdingRows.length > 0 && (
-            <HoldingsTable rows={derived.holdingRows} onSelect={setSelectedAssetId} onAddTransaction={handleAddTransaction} />
+            <HoldingsTable rows={derived.holdingRows} onSelect={setSelectedAssetId} />
           )}
+
+          {/* Section D: Add Transaction */}
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setTxDialogOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add Transaction
+            </Button>
+          </div>
         </>
       )}
 
       <AddTransactionDialog
-        key={txAssetId ?? "no-asset"}
-        assetId={txAssetId}
+        key="add-tx"
         open={txDialogOpen}
         onOpenChange={setTxDialogOpen}
       />

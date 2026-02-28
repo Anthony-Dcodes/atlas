@@ -1,5 +1,4 @@
 import { formatCurrency, formatPercent } from "@/lib/utils/formatCurrency";
-import { Plus } from "lucide-react";
 import type { Asset } from "@/types";
 
 export interface HoldingRow {
@@ -20,7 +19,6 @@ export interface HoldingRow {
 interface Props {
   rows: HoldingRow[];
   onSelect: (id: string) => void;
-  onAddTransaction?: (assetId: string) => void;
 }
 
 const typeBadgeClass: Record<string, string> = {
@@ -34,7 +32,7 @@ function formatQty(qty: number, assetType: string): string {
   return qty.toFixed(decimals);
 }
 
-export function HoldingsTable({ rows, onSelect, onAddTransaction }: Props) {
+export function HoldingsTable({ rows, onSelect }: Props) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60">
       <div className="border-b border-zinc-800 px-6 py-3">
@@ -52,7 +50,6 @@ export function HoldingsTable({ rows, onSelect, onAddTransaction }: Props) {
             <th className="px-3 py-3 text-right font-medium">Value</th>
             <th className="px-3 py-3 text-right font-medium">P&L</th>
             <th className="px-3 py-3 text-right font-medium">Alloc</th>
-            {onAddTransaction && <th className="w-10 px-2 py-3" />}
           </tr>
         </thead>
         <tbody>
@@ -131,20 +128,6 @@ export function HoldingsTable({ rows, onSelect, onAddTransaction }: Props) {
                   <span className="text-zinc-500">---</span>
                 )}
               </td>
-              {onAddTransaction && (
-                <td className="px-2 py-4 text-center">
-                  <button
-                    className="rounded p-1 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
-                    title="Add transaction"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAddTransaction(row.asset.id);
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </td>
-              )}
             </tr>
           ))}
         </tbody>
