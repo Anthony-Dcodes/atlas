@@ -21,12 +21,6 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
-const typeBadgeClass: Record<string, string> = {
-  stock: "border-blue-500/40 bg-blue-500/10 text-blue-400",
-  crypto: "border-violet-500/40 bg-violet-500/10 text-violet-400",
-  commodity: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-};
-
 function formatQty(qty: number, assetType: string): string {
   const decimals = assetType === "crypto" ? 6 : 2;
   return qty.toFixed(decimals);
@@ -39,11 +33,10 @@ export function HoldingsTable({ rows, onSelect }: Props) {
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Assets</p>
       </div>
       <div className="overflow-x-auto">
-      <table className="w-full min-w-[700px]">
+      <table className="w-full min-w-[580px]">
         <thead>
           <tr className="border-b border-zinc-800 text-xs text-zinc-500">
-            <th className="px-4 py-3 text-left font-medium">Symbol</th>
-            <th className="px-3 py-3 text-left font-medium">Name</th>
+            <th className="px-4 py-3 text-left font-medium">Asset</th>
             <th className="px-3 py-3 text-right font-medium">Price</th>
             <th className="px-3 py-3 text-right font-medium">Holdings</th>
             <th className="px-3 py-3 text-right font-medium">Value</th>
@@ -60,75 +53,62 @@ export function HoldingsTable({ rows, onSelect }: Props) {
               }`}
               onClick={() => onSelect(row.asset.id)}
             >
-              <td className="px-4 py-4">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span style={{ color: row.color }}>●</span>
-                    <span className="font-semibold text-zinc-100">{row.asset.symbol}</span>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span style={{ color: row.color }} className="shrink-0 text-xs leading-none">●</span>
+                  <div className="min-w-0">
+                    <div className="font-semibold leading-tight text-zinc-100">{row.asset.symbol}</div>
+                    <div className="truncate text-xs leading-tight text-zinc-500">{row.asset.name}</div>
                   </div>
-                  {row.isHeld && row.netQty !== 0 && (
-                    row.netQty > 0 ? (
-                      <span className="w-fit rounded px-1.5 py-0.5 text-[10px] font-semibold border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
-                        LONG
-                      </span>
-                    ) : (
-                      <span className="w-fit rounded px-1.5 py-0.5 text-[10px] font-semibold border border-red-500/40 bg-red-500/10 text-red-400">
-                        SHORT
-                      </span>
-                    )
-                  )}
                 </div>
+                {row.isHeld && row.netQty < 0 && (
+                  <span className="ml-[18px] text-[10px] font-medium tracking-wide text-zinc-500">SHORT</span>
+                )}
               </td>
-              <td className="px-3 py-4 max-w-[160px]">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm text-zinc-300">{row.asset.name}</span>
-                  <span
-                    className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${typeBadgeClass[row.asset.asset_type] ?? ""}`}
-                  >
-                    {row.asset.asset_type}
-                  </span>
-                </div>
-              </td>
-              <td className="px-3 py-4 text-right tabular-nums text-zinc-100">
+              <td className="px-3 py-3 text-right tabular-nums text-zinc-100">
                 {row.latestPrice !== null ? (
                   formatCurrency(row.latestPrice)
                 ) : row.priceLoading ? (
-                  <span className="text-zinc-500 animate-pulse">Loading…</span>
+                  <span className="animate-pulse text-zinc-500">Loading…</span>
                 ) : row.priceError ? (
                   <span className="text-amber-400" title="Price fetch failed">Error</span>
                 ) : (
                   <span className="text-zinc-500">—</span>
                 )}
               </td>
-              <td className="px-3 py-4 text-right tabular-nums text-zinc-300">
+              <td className="px-3 py-3 text-right tabular-nums text-zinc-300">
                 {row.isHeld ? (
                   formatQty(row.netQty, row.asset.asset_type)
                 ) : (
-                  <span className="text-zinc-500">---</span>
+                  <span className="text-zinc-500">—</span>
                 )}
               </td>
-              <td className="px-3 py-4 text-right tabular-nums text-zinc-100">
+              <td className="px-3 py-3 text-right tabular-nums text-zinc-100">
                 {row.isHeld && row.assetValue !== null ? (
                   formatCurrency(row.assetValue)
                 ) : (
-                  <span className="text-zinc-500">---</span>
+                  <span className="text-zinc-500">—</span>
                 )}
               </td>
-              <td className="px-3 py-4 text-right tabular-nums">
+              <td className="px-3 py-3 text-right tabular-nums">
                 {row.isHeld && row.unrealizedPnL !== null && row.pnlPct !== null ? (
-                  <div className={row.unrealizedPnL >= 0 ? "text-emerald-400" : "text-red-400"}>
-                    <div>{formatCurrency(row.unrealizedPnL)}</div>
-                    <div className="text-xs opacity-70">{formatPercent(row.pnlPct)}</div>
+                  <div>
+                    <div className={`tabular-nums ${row.unrealizedPnL >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {formatPercent(row.pnlPct)}
+                    </div>
+                    <div className="text-xs tabular-nums text-zinc-500">
+                      {formatCurrency(row.unrealizedPnL)}
+                    </div>
                   </div>
                 ) : (
-                  <span className="text-zinc-500">---</span>
+                  <span className="text-zinc-500">—</span>
                 )}
               </td>
-              <td className="px-3 py-4 text-right tabular-nums text-zinc-400">
+              <td className="px-3 py-3 text-right tabular-nums text-zinc-400">
                 {row.isHeld ? (
                   `${row.allocationPct.toFixed(1)}%`
                 ) : (
-                  <span className="text-zinc-500">---</span>
+                  <span className="text-zinc-500">—</span>
                 )}
               </td>
             </tr>

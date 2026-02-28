@@ -6,6 +6,12 @@ import { formatDate } from "@/lib/utils/dateHelpers";
 import { Trash2 } from "lucide-react";
 import type { PriceCacheMeta } from "@/types";
 
+const providerBadgeClass: Record<string, string> = {
+  TwelveData: "border-blue-500/40 bg-blue-500/10 text-blue-400",
+  CoinGecko: "border-violet-500/40 bg-violet-500/10 text-violet-400",
+  Binance: "border-yellow-500/40 bg-yellow-500/10 text-yellow-400",
+};
+
 function providerLabel(provider: string): string {
   switch (provider.toLowerCase()) {
     case "binance": return "Binance";
@@ -72,7 +78,7 @@ export function AssetManagerPage() {
                     </td>
                     <td className="px-4 py-3">
                       {meta ? (
-                        <Badge variant="outline" className="text-xs border-blue-500/40 bg-blue-500/10 text-blue-400">
+                        <Badge variant="outline" className={`text-xs ${providerBadgeClass[meta.provider] ?? "border-zinc-600 text-zinc-400"}`}>
                           {providerLabel(meta.provider)}
                         </Badge>
                       ) : (
