@@ -53,6 +53,7 @@ export interface SymbolSearchResult {
 export interface AssetHoldingSummary {
   total_bought: number;
   total_sold: number;
+  total_sold_value: number;
   net_quantity: number;
   total_cost_basis: number;
   avg_cost_per_unit: number;

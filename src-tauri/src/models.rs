@@ -114,6 +114,7 @@ pub struct SymbolSearchResult {
 pub struct AssetHoldingSummary {
     pub total_bought: f64,
     pub total_sold: f64,
+    pub total_sold_value: f64,
     pub net_quantity: f64,
     pub total_cost_basis: f64,
     pub avg_cost_per_unit: f64,

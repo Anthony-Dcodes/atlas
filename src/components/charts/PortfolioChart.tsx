@@ -108,17 +108,16 @@ export function PortfolioChart({ allPrices, transactions, height = 300, timeRang
     const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
     const chartData: AreaData<UTCTimestamp>[] = sortedTimestamps.flatMap((ts) => {
       let total = 0;
-      let hasAny = false;
+      let hasPriceData = false;
       for (const { txs, prices } of assetArrays) {
         const qty = getQtyAtTime(txs, ts);
-        if (qty <= 0) continue;
         const close = getLastKnownClose(prices, ts);
         if (close !== null) {
           total += qty * close;
-          hasAny = true;
+          hasPriceData = true;
         }
       }
-      return hasAny ? [{ time: ts as UTCTimestamp, value: total }] : [];
+      return hasPriceData ? [{ time: ts as UTCTimestamp, value: total }] : [];
     });
 
     if (chartData.length > 0) {

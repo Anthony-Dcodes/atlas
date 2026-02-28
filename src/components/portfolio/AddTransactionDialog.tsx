@@ -155,7 +155,7 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      {!isEdit && (
+      {!isEdit && !onOpenChange && (
         <DialogTrigger asChild>
           <Button size="sm">
             <Plus className="mr-2 h-4 w-4" />

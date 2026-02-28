@@ -55,6 +55,8 @@ export function Dashboard() {
     let totalValue = 0;
     let totalValue24hAgo = 0;
     let totalCostBasis = 0;
+    let totalSoldValue = 0;
+    let totalLongValue = 0;
     let totalUnrealizedPnL = 0;
 
     const assetPrices = assets.map((asset, i) => {
@@ -62,7 +64,7 @@ export function Dashboard() {
       const sorted = [...data].sort((a, b) => a.ts - b.ts);
       const latestPrice = sorted.length > 0 ? sorted[sorted.length - 1]!.close : null;
       const holding: AssetHoldingSummary | null = holdingResults[i]?.data ?? null;
-      const isHeld = holding !== null && holding.total_bought > 0;
+      const isHeld = holding !== null && (holding.total_bought > 0 || holding.total_sold > 0);
 
       if (latestPrice !== null) {
         allPrices.set(asset.id, sorted);
@@ -71,6 +73,7 @@ export function Dashboard() {
       if (isHeld && latestPrice !== null) {
         const assetValue = holding.net_quantity * latestPrice;
         totalValue += assetValue;
+        if (assetValue > 0) totalLongValue += assetValue;
 
         const cutoff = daysAgo(1);
         const historicalRow = sorted.filter((p) => p.ts <= cutoff).pop();
@@ -78,8 +81,9 @@ export function Dashboard() {
         totalValue24hAgo += holding.net_quantity * price24hAgo;
 
         const currentValue = holding.net_quantity * latestPrice;
-        const pnl = currentValue - holding.total_cost_basis + (holding.total_sold * holding.avg_cost_per_unit);
+        const pnl = currentValue + holding.total_sold_value - holding.total_cost_basis;
         totalCostBasis += holding.total_cost_basis;
+        totalSoldValue += holding.total_sold_value;
         totalUnrealizedPnL += pnl;
       }
 
@@ -89,8 +93,9 @@ export function Dashboard() {
     const change24hValue = totalValue - totalValue24hAgo;
     const change24hPct =
       totalValue24hAgo > 0 ? (change24hValue / totalValue24hAgo) * 100 : 0;
+    const totalPnLBasis = totalCostBasis + totalSoldValue;
     const totalPnLPct =
-      totalCostBasis > 0 ? (totalUnrealizedPnL / totalCostBasis) * 100 : 0;
+      totalPnLBasis > 0 ? (totalUnrealizedPnL / totalPnLBasis) * 100 : 0;
 
     const holdingRows = assetPrices.map(({ asset, sorted, latestPrice, holding, isHeld }, i) => {
       let netQty = 0;
@@ -101,10 +106,9 @@ export function Dashboard() {
       if (isHeld && holding && latestPrice !== null) {
         netQty = holding.net_quantity;
         assetValue = holding.net_quantity * latestPrice;
-        unrealizedPnL = assetValue - holding.total_cost_basis + (holding.total_sold * holding.avg_cost_per_unit);
-        pnlPct = holding.total_cost_basis > 0
-          ? (unrealizedPnL / holding.total_cost_basis) * 100
-          : 0;
+        unrealizedPnL = assetValue + holding.total_sold_value - holding.total_cost_basis;
+        const pnlBasis = holding.total_cost_basis > 0 ? holding.total_cost_basis : holding.total_sold_value;
+        pnlPct = pnlBasis > 0 ? (unrealizedPnL / pnlBasis) * 100 : 0;
       } else if (isHeld && holding) {
         netQty = holding.net_quantity;
       }
@@ -117,7 +121,9 @@ export function Dashboard() {
         asset,
         latestPrice,
         change24h: sorted.length > 0 ? calcChange(sorted, 1) : null,
-        allocationPct: isHeld && totalValue > 0 ? ((assetValue ?? 0) / totalValue) * 100 : 0,
+        allocationPct: isHeld && assetValue !== null && assetValue > 0 && totalLongValue > 0
+          ? (assetValue / totalLongValue) * 100
+          : 0,
         color: colorMap.get(asset.id) ?? "#71717a",
         isHeld,
         netQty,
@@ -138,7 +144,7 @@ export function Dashboard() {
     });
 
     const segments = holdingRows
-      .filter((row) => row.isHeld)
+      .filter((row) => row.isHeld && row.assetValue !== null && row.assetValue > 0)
       .sort((a, b) => b.allocationPct - a.allocationPct)
       .map((row) => ({
         assetId: row.asset.id,
