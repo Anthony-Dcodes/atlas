@@ -41,7 +41,7 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
 
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [txType, setTxType] = useState<TxType>(transaction?.tx_type ?? "buy");
-  const [inputMode, setInputMode] = useState<"quantity" | "total">("quantity");
+  const [inputMode, setInputMode] = useState<"quantity" | "total" | "conversion">("quantity");
   const [quantity, setQuantity] = useState(transaction ? String(transaction.quantity) : "");
   const [priceUsd, setPriceUsd] = useState(transaction ? String(transaction.price_usd) : "");
   const [totalAmount, setTotalAmount] = useState("");
@@ -74,14 +74,27 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
       return;
     }
 
-    const price = parseFloat(priceUsd);
-    if (isNaN(price) || price <= 0) {
-      setError("Price must be a positive number");
-      return;
-    }
-
+    let price: number;
     let qty: number;
-    if (inputMode === "total") {
+
+    if (inputMode === "conversion") {
+      qty = parseFloat(quantity);
+      const total = parseFloat(totalAmount);
+      if (isNaN(qty) || qty <= 0) {
+        setError("Quantity received must be a positive number");
+        return;
+      }
+      if (isNaN(total) || total <= 0) {
+        setError("Total paid must be a positive number");
+        return;
+      }
+      price = total / qty;
+    } else if (inputMode === "total") {
+      price = parseFloat(priceUsd);
+      if (isNaN(price) || price <= 0) {
+        setError("Price must be a positive number");
+        return;
+      }
       const total = parseFloat(totalAmount);
       if (isNaN(total) || total <= 0) {
         setError("Total amount must be a positive number");
@@ -89,6 +102,11 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
       }
       qty = total / price;
     } else {
+      price = parseFloat(priceUsd);
+      if (isNaN(price) || price <= 0) {
+        setError("Price must be a positive number");
+        return;
+      }
       qty = parseFloat(quantity);
       if (isNaN(qty) || qty <= 0) {
         setError("Quantity must be a positive number");
@@ -96,8 +114,8 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
       }
     }
 
-    if (!isFinite(qty) || qty <= 0) {
-      setError("Computed quantity is invalid");
+    if (!isFinite(qty) || qty <= 0 || !isFinite(price) || price <= 0) {
+      setError("Computed values are invalid");
       return;
     }
     if (!date) {
@@ -194,6 +212,13 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
             >
               By Total
             </button>
+            <button
+              type="button"
+              className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "conversion" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+              onClick={() => setInputMode("conversion")}
+            >
+              By Conversion
+            </button>
           </div>
           {inputMode === "quantity" ? (
             <>
@@ -227,7 +252,7 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
                 </div>
               )}
             </>
-          ) : (
+          ) : inputMode === "total" ? (
             <>
               <div className="space-y-2">
                 <Label htmlFor="totalAmount">Total Amount (USD)</Label>
@@ -256,6 +281,38 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
               {totalAmount && priceUsd && parseFloat(totalAmount) > 0 && parseFloat(priceUsd) > 0 && (
                 <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
                   Quantity: <span className="text-zinc-200">{(parseFloat(totalAmount) / parseFloat(priceUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity received</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 0.012"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="totalAmount">Total paid (USD)</Label>
+                <Input
+                  id="totalAmount"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 500"
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value)}
+                />
+              </div>
+              {quantity && totalAmount && parseFloat(quantity) > 0 && parseFloat(totalAmount) > 0 && (
+                <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
+                  Price per unit: <span className="text-zinc-200">${(parseFloat(totalAmount) / parseFloat(quantity)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                 </div>
               )}
             </>

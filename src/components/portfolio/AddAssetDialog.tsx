@@ -41,7 +41,7 @@ export function AddAssetDialog() {
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [assetType, setAssetType] = useState<AssetType>("stock");
-  const [purchaseMode, setPurchaseMode] = useState<"quantity" | "total">("quantity");
+  const [purchaseMode, setPurchaseMode] = useState<"quantity" | "total" | "conversion">("quantity");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [purchaseQty, setPurchaseQty] = useState("");
   const [purchaseTotal, setPurchaseTotal] = useState("");
@@ -89,10 +89,19 @@ export function AddAssetDialog() {
       return;
     }
 
-    const hasAmount = purchaseMode === "quantity" ? purchaseQty !== "" : purchaseTotal !== "";
-    const hasPrice = purchasePrice !== "";
-    const hasAny = hasAmount || hasPrice;
-    const hasAll = purchaseDate !== "" && hasAmount && hasPrice;
+    let hasAny: boolean;
+    let hasAll: boolean;
+    if (purchaseMode === "conversion") {
+      const hasQty = purchaseQty !== "";
+      const hasTotal = purchaseTotal !== "";
+      hasAny = hasQty || hasTotal;
+      hasAll = purchaseDate !== "" && hasQty && hasTotal;
+    } else {
+      const hasAmount = purchaseMode === "quantity" ? purchaseQty !== "" : purchaseTotal !== "";
+      const hasPrice = purchasePrice !== "";
+      hasAny = hasAmount || hasPrice;
+      hasAll = purchaseDate !== "" && hasAmount && hasPrice;
+    }
 
     if (hasAny && !hasAll) {
       setError("Complete all purchase fields or leave them all empty");
@@ -102,12 +111,25 @@ export function AddAssetDialog() {
     let parsedQty: number | undefined;
     let parsedPrice: number | undefined;
     if (hasAll) {
-      parsedPrice = parseFloat(purchasePrice);
-      if (isNaN(parsedPrice) || parsedPrice <= 0) {
-        setError("Purchase price must be a positive number");
-        return;
-      }
-      if (purchaseMode === "total") {
+      if (purchaseMode === "conversion") {
+        const parsedQtyVal = parseFloat(purchaseQty);
+        const parsedTotalVal = parseFloat(purchaseTotal);
+        if (isNaN(parsedQtyVal) || parsedQtyVal <= 0) {
+          setError("Quantity received must be a positive number");
+          return;
+        }
+        if (isNaN(parsedTotalVal) || parsedTotalVal <= 0) {
+          setError("Total paid must be a positive number");
+          return;
+        }
+        parsedQty = parsedQtyVal;
+        parsedPrice = parsedTotalVal / parsedQtyVal;
+      } else if (purchaseMode === "total") {
+        parsedPrice = parseFloat(purchasePrice);
+        if (isNaN(parsedPrice) || parsedPrice <= 0) {
+          setError("Purchase price must be a positive number");
+          return;
+        }
         const parsedTotal = parseFloat(purchaseTotal);
         if (isNaN(parsedTotal) || parsedTotal <= 0) {
           setError("Total amount must be a positive number");
@@ -115,6 +137,11 @@ export function AddAssetDialog() {
         }
         parsedQty = parsedTotal / parsedPrice;
       } else {
+        parsedPrice = parseFloat(purchasePrice);
+        if (isNaN(parsedPrice) || parsedPrice <= 0) {
+          setError("Purchase price must be a positive number");
+          return;
+        }
         parsedQty = parseFloat(purchaseQty);
         if (isNaN(parsedQty) || parsedQty <= 0) {
           setError("Purchase quantity must be a positive number");
@@ -259,6 +286,13 @@ export function AddAssetDialog() {
               >
                 By Total
               </button>
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${purchaseMode === "conversion" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setPurchaseMode("conversion")}
+              >
+                By Conversion
+              </button>
             </div>
             <div className="space-y-2">
               <Label htmlFor="purchaseDate">Date</Label>
@@ -282,7 +316,7 @@ export function AddAssetDialog() {
                   onChange={(e) => setPurchaseQty(e.target.value)}
                 />
               </div>
-            ) : (
+            ) : purchaseMode === "total" ? (
               <div className="space-y-2">
                 <Label htmlFor="purchaseTotal">Total Amount (USD)</Label>
                 <Input
@@ -295,19 +329,48 @@ export function AddAssetDialog() {
                   onChange={(e) => setPurchaseTotal(e.target.value)}
                 />
               </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="purchaseQty">Quantity received</Label>
+                  <Input
+                    id="purchaseQty"
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="e.g. 0.012"
+                    value={purchaseQty}
+                    onChange={(e) => setPurchaseQty(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purchaseTotal">Total paid (USD)</Label>
+                  <Input
+                    id="purchaseTotal"
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="e.g. 500"
+                    value={purchaseTotal}
+                    onChange={(e) => setPurchaseTotal(e.target.value)}
+                  />
+                </div>
+              </>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="purchasePrice">Price per unit (USD)</Label>
-              <Input
-                id="purchasePrice"
-                type="number"
-                step="any"
-                min="0"
-                placeholder="e.g. 150.00"
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(e.target.value)}
-              />
-            </div>
+            {purchaseMode !== "conversion" && (
+              <div className="space-y-2">
+                <Label htmlFor="purchasePrice">Price per unit (USD)</Label>
+                <Input
+                  id="purchasePrice"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 150.00"
+                  value={purchasePrice}
+                  onChange={(e) => setPurchasePrice(e.target.value)}
+                />
+              </div>
+            )}
             {purchaseMode === "quantity" && purchaseQty && purchasePrice && parseFloat(purchaseQty) > 0 && parseFloat(purchasePrice) > 0 && (
               <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
                 Total: <span className="text-zinc-200">${(parseFloat(purchaseQty) * parseFloat(purchasePrice)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -316,6 +379,11 @@ export function AddAssetDialog() {
             {purchaseMode === "total" && purchaseTotal && purchasePrice && parseFloat(purchaseTotal) > 0 && parseFloat(purchasePrice) > 0 && (
               <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
                 Quantity: <span className="text-zinc-200">{(parseFloat(purchaseTotal) / parseFloat(purchasePrice)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+              </div>
+            )}
+            {purchaseMode === "conversion" && purchaseQty && purchaseTotal && parseFloat(purchaseQty) > 0 && parseFloat(purchaseTotal) > 0 && (
+              <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
+                Price per unit: <span className="text-zinc-200">${(parseFloat(purchaseTotal) / parseFloat(purchaseQty)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
               </div>
             )}
           </div>
