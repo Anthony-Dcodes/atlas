@@ -5,13 +5,20 @@ import { AddTransactionDialog } from "@/components/portfolio/AddTransactionDialo
 import { TransactionList } from "@/components/portfolio/TransactionList";
 import { HoldingSummary } from "@/components/portfolio/HoldingSummary";
 import { usePrices, useRefreshAsset } from "@/hooks/usePrices";
-import { useRemoveAsset } from "@/hooks/useAssets";
+import { useRemoveAsset, useAllCacheMeta } from "@/hooks/useAssets";
+import { useTransactions } from "@/hooks/useTransactions";
 import { useAssetsStore } from "@/stores/assetsStore";
 import { formatCurrency, formatPercent } from "@/lib/utils/formatCurrency";
-import { formatDateTime, daysAgo } from "@/lib/utils/dateHelpers";
+import { formatDateTime, formatRelativeTime, formatDate, daysAgo } from "@/lib/utils/dateHelpers";
 import type { Asset } from "@/types";
 import { ArrowLeft, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
+
+const providerBadgeClass: Record<string, string> = {
+  TwelveData: "border-blue-500/40 bg-blue-500/10 text-blue-400",
+  CoinGecko: "border-violet-500/40 bg-violet-500/10 text-violet-400",
+  Binance: "border-yellow-500/40 bg-yellow-500/10 text-yellow-400",
+};
 
 interface Props {
   asset: Asset;
@@ -23,9 +30,23 @@ export function AssetDetail({ asset }: Props) {
   const removeAsset = useRemoveAsset();
   const setSelectedAssetId = useAssetsStore((s) => s.setSelectedAssetId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { data: allMeta } = useAllCacheMeta();
+  const { data: txs } = useTransactions(asset.id);
 
   const sortedPrices = [...(prices ?? [])].sort((a, b) => a.ts - b.ts);
   const latestPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1]! : null;
+
+  const cacheMeta = allMeta?.find((m) => m.asset_id === asset.id) ?? null;
+
+  const buyCount = txs?.filter((t) => t.tx_type === "buy").length ?? 0;
+  const sellCount = txs?.filter((t) => t.tx_type === "sell").length ?? 0;
+
+  const firstPrice = sortedPrices[0];
+  const lastPrice = sortedPrices[sortedPrices.length - 1];
+  const historyDays =
+    firstPrice && lastPrice && firstPrice !== lastPrice
+      ? Math.round((lastPrice.ts - firstPrice.ts) / 86400)
+      : null;
 
   function calcChange(daysBack: number): number | null {
     if (sortedPrices.length < 2) return null;
@@ -112,6 +133,21 @@ export function AssetDetail({ asset }: Props) {
           Last updated: {formatDateTime(latestPrice.ts)}
         </p>
       )}
+      {cacheMeta && (
+        <p className="text-xs text-muted-foreground flex items-center gap-2">
+          Provider:
+          <span className={`rounded border px-1.5 py-0.5 text-xs ${providerBadgeClass[cacheMeta.provider] ?? ""}`}>
+            {cacheMeta.provider}
+          </span>
+          · Fetched {formatRelativeTime(cacheMeta.last_fetched)}
+        </p>
+      )}
+      {historyDays !== null && firstPrice && lastPrice && (
+        <p className="text-xs text-muted-foreground">
+          Price history: {formatDate(firstPrice.ts)} – {formatDate(lastPrice.ts)}{" "}
+          <span className="text-zinc-600">({historyDays.toLocaleString()} days)</span>
+        </p>
+      )}
 
       {isLoading && <p className="text-muted-foreground">Loading price data...</p>}
       {!isLoading && sortedPrices.length > 0 && <AssetChart data={sortedPrices} />}
@@ -127,7 +163,16 @@ export function AssetDetail({ asset }: Props) {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Transactions</h3>
+          <div>
+            <h3 className="text-lg font-semibold">Transactions</h3>
+            {(buyCount > 0 || sellCount > 0) && (
+              <p className="text-xs text-muted-foreground">
+                {buyCount > 0 && `${buyCount} buy${buyCount !== 1 ? "s" : ""}`}
+                {buyCount > 0 && sellCount > 0 && " · "}
+                {sellCount > 0 && `${sellCount} sell${sellCount !== 1 ? "s" : ""}`}
+              </p>
+            )}
+          </div>
           <AddTransactionDialog assetId={asset.id} />
         </div>
         <TransactionList assetId={asset.id} />
