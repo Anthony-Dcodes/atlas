@@ -32,6 +32,19 @@ function tsToDateStr(ts: number): string {
   return new Date(ts * 1000).toISOString().slice(0, 10);
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function daysInMonth(year: string, month: string): number {
+  if (!year || !month) return 31;
+  return new Date(parseInt(year), parseInt(month), 0).getDate();
+}
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
+
 export function AddTransactionDialog({ assetId, transaction, open: controlledOpen, onOpenChange }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -46,11 +59,13 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
   const [priceUsd, setPriceUsd] = useState(transaction ? String(transaction.price_usd) : "");
   const [totalAmount, setTotalAmount] = useState("");
   const [unknownDate, setUnknownDate] = useState(transaction !== undefined && transaction.ts === 0);
-  const [date, setDate] = useState(
-    transaction && transaction.ts !== 0
-      ? tsToDateStr(transaction.ts)
-      : new Date().toISOString().slice(0, 10)
-  );
+  const initDateStr = transaction && transaction.ts !== 0
+    ? tsToDateStr(transaction.ts)
+    : new Date().toISOString().slice(0, 10);
+  const [initY, initM, initD] = initDateStr.split("-");
+  const [dateYear, setDateYear] = useState(initY ?? "");
+  const [dateMonth, setDateMonth] = useState(initM ?? "");
+  const [dateDay, setDateDay] = useState(initD ?? "");
   const [notes, setNotes] = useState(transaction?.notes ?? "");
   const [error, setError] = useState("");
   const { data: assets } = useAssets();
@@ -66,7 +81,10 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
     setPriceUsd("");
     setTotalAmount("");
     setUnknownDate(false);
-    setDate(new Date().toISOString().slice(0, 10));
+    const todayParts = new Date().toISOString().slice(0, 10).split("-");
+    setDateYear(todayParts[0] ?? "");
+    setDateMonth(todayParts[1] ?? "");
+    setDateDay(todayParts[2] ?? "");
     setNotes("");
     setError("");
   }
@@ -136,7 +154,11 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
       return;
     }
 
-    const ts = unknownDate ? 0 : Math.floor(new Date(date).getTime() / 1000);
+    if (!unknownDate && (!dateYear || !dateMonth || !dateDay)) {
+      setError("Please select a complete date");
+      return;
+    }
+    const ts = unknownDate ? 0 : Math.floor(new Date(`${dateYear}-${dateMonth}-${dateDay}`).getTime() / 1000);
 
     try {
       if (isEdit) {
@@ -356,7 +378,7 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
             </>
           )}
           <div className="space-y-2">
-            <Label htmlFor="date">Date{txType === "snapshot" ? " (optional)" : ""}</Label>
+            <Label>Date{txType === "snapshot" ? " (optional)" : ""}</Label>
             {txType === "snapshot" && (
               <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
                 <input
@@ -369,12 +391,54 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
               </label>
             )}
             {!unknownDate && (
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Select
+                  value={dateYear}
+                  onValueChange={(y) => {
+                    setDateYear(y);
+                    const max = daysInMonth(y, dateMonth);
+                    if (dateDay && parseInt(dateDay) > max) setDateDay(String(max).padStart(2, "0"));
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEAR_OPTIONS.map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={dateMonth}
+                  onValueChange={(m) => {
+                    setDateMonth(m);
+                    const max = daysInMonth(dateYear, m);
+                    if (dateDay && parseInt(dateDay) > max) setDateDay(String(max).padStart(2, "0"));
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES.map((name, i) => {
+                      const val = String(i + 1).padStart(2, "0");
+                      return <SelectItem key={val} value={val}>{name}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+                <Select value={dateDay} onValueChange={setDateDay}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: daysInMonth(dateYear, dateMonth) }, (_, i) => {
+                      const val = String(i + 1).padStart(2, "0");
+                      return <SelectItem key={val} value={val}>{i + 1}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
           <div className="space-y-2">
