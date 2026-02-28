@@ -101,6 +101,23 @@ pub fn get_cache_meta(conn: &Connection, asset_id: &str) -> anyhow::Result<Optio
     }
 }
 
+pub fn list_all_cache_meta(conn: &Connection) -> anyhow::Result<Vec<PriceCacheMeta>> {
+    let mut stmt =
+        conn.prepare("SELECT asset_id, provider, last_fetched FROM price_cache_meta")?;
+    let rows = stmt.query_map([], |row| {
+        Ok(PriceCacheMeta {
+            asset_id: row.get(0)?,
+            provider: row.get(1)?,
+            last_fetched: row.get(2)?,
+        })
+    })?;
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
 pub fn update_cache_meta(
     conn: &Connection,
     asset_id: &str,

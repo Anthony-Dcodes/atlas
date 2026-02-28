@@ -33,6 +33,7 @@ pub fn run() {
             commands::assets::purge_asset,
             commands::prices::fetch_prices,
             commands::prices::refresh_asset,
+            commands::prices::list_cache_meta,
             commands::settings::save_api_key,
             commands::settings::has_api_key,
             commands::settings::remove_api_key,

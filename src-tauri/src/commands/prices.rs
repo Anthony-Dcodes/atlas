@@ -1,5 +1,5 @@
 use crate::db::queries;
-use crate::models::{AssetType, DateRange, OHLCVRow};
+use crate::models::{AssetType, DateRange, OHLCVRow, PriceCacheMeta};
 use crate::providers::binance::BinanceProvider;
 use crate::providers::coingecko::CoinGeckoProvider;
 use crate::providers::twelve_data::TwelveDataProvider;
@@ -127,6 +127,15 @@ pub async fn fetch_prices(
     // Return from DB
     state
         .with_db(|conn| queries::prices::get_prices(conn, &asset_id, None, None))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_cache_meta(
+    state: State<'_, AppState>,
+) -> Result<Vec<PriceCacheMeta>, String> {
+    state
+        .with_db(|conn| queries::prices::list_all_cache_meta(conn))
         .map_err(|e| e.to_string())
 }
 

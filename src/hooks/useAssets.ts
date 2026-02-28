@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listAssets, addAsset, removeAsset, listAllAssets, purgeAsset } from "@/lib/tauri/assets";
+import { listCacheMeta } from "@/lib/tauri/prices";
 import type { AssetType } from "@/types";
 
 export function useAssets() {
@@ -43,6 +44,13 @@ export function useAllAssets() {
   return useQuery({
     queryKey: ["allAssets"],
     queryFn: listAllAssets,
+  });
+}
+
+export function useAllCacheMeta() {
+  return useQuery({
+    queryKey: ["cacheMeta"],
+    queryFn: listCacheMeta,
   });
 }
 

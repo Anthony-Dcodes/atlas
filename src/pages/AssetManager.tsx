@@ -1,14 +1,31 @@
-import { useState } from "react";
-import { useAllAssets, usePurgeAsset } from "@/hooks/useAssets";
+import { useState, useMemo } from "react";
+import { useAllAssets, useAllCacheMeta, usePurgeAsset } from "@/hooks/useAssets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils/dateHelpers";
 import { Trash2 } from "lucide-react";
+import type { PriceCacheMeta } from "@/types";
+
+function providerLabel(provider: string): string {
+  switch (provider.toLowerCase()) {
+    case "binance": return "Binance";
+    case "twelve_data": return "Twelve Data";
+    case "coingecko": return "CoinGecko";
+    default: return provider;
+  }
+}
 
 export function AssetManagerPage() {
   const { data: assets, isLoading } = useAllAssets();
+  const { data: cacheMetas } = useAllCacheMeta();
   const purge = usePurgeAsset();
   const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const cacheMetaMap = useMemo(() => {
+    const map = new Map<string, PriceCacheMeta>();
+    cacheMetas?.forEach((m) => map.set(m.asset_id, m));
+    return map;
+  }, [cacheMetas]);
 
   return (
     <div className="space-y-4">
@@ -24,12 +41,13 @@ export function AssetManagerPage() {
 
       {assets && assets.length > 0 && (
         <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="w-full min-w-[780px] text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-left text-xs uppercase tracking-wider text-zinc-500">
                 <th className="px-4 py-3">Symbol</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Provider</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Added</th>
                 <th className="px-4 py-3">Deleted</th>
@@ -39,6 +57,7 @@ export function AssetManagerPage() {
             <tbody>
               {assets.map((asset) => {
                 const isDeleted = asset.deleted_at !== null && asset.deleted_at !== undefined;
+                const meta = cacheMetaMap.get(asset.id);
                 return (
                   <tr
                     key={asset.id}
@@ -50,6 +69,15 @@ export function AssetManagerPage() {
                       <Badge variant="outline" className="text-xs">
                         {asset.asset_type}
                       </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      {meta ? (
+                        <Badge variant="outline" className="text-xs border-blue-500/40 bg-blue-500/10 text-blue-400">
+                          {providerLabel(meta.provider)}
+                        </Badge>
+                      ) : (
+                        <span className="text-zinc-600">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {isDeleted ? (
