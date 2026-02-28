@@ -107,7 +107,7 @@ export function TransactionsPage() {
             <tbody>
               {allTransactions.map((tx) => (
                 <tr key={tx.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                  <td className="px-4 py-3 text-zinc-300">{formatDate(tx.ts)}</td>
+                  <td className="px-4 py-3 text-zinc-300">{tx.ts === 0 ? <span className="text-zinc-500 italic">Unknown date</span> : formatDate(tx.ts)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-zinc-100">{tx.asset.symbol}</span>
@@ -118,18 +118,18 @@ export function TransactionsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <Badge
-                      variant={tx.tx_type === "buy" ? "default" : "destructive"}
-                      className={tx.tx_type === "buy" ? "bg-green-600" : ""}
+                      variant={tx.tx_type === "buy" ? "default" : tx.tx_type === "sell" ? "destructive" : "outline"}
+                      className={tx.tx_type === "buy" ? "bg-green-600" : tx.tx_type === "snapshot" ? "text-zinc-400" : ""}
                     >
-                      {tx.tx_type === "buy" ? "BUY" : "SELL"}
+                      {tx.tx_type === "buy" ? "BUY" : tx.tx_type === "sell" ? "SELL" : "BALANCE"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right text-zinc-300">{tx.quantity}</td>
                   <td className="px-4 py-3 text-right text-zinc-300">
-                    {formatCurrency(tx.price_usd)}
+                    {tx.tx_type === "snapshot" ? <span className="text-zinc-500">—</span> : formatCurrency(tx.price_usd)}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-zinc-100">
-                    {formatCurrency(tx.quantity * tx.price_usd)}
+                    {tx.tx_type === "snapshot" ? <span className="text-zinc-500">—</span> : formatCurrency(tx.quantity * tx.price_usd)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {unlockingTxId === tx.id ? (
@@ -171,22 +171,24 @@ export function TransactionsPage() {
                         <Button variant="ghost" size="sm" onClick={() => setEditingTx(tx)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title={tx.locked_at !== null ? "Locked — click to unlock" : "Lock transaction"}
-                          className={tx.locked_at !== null ? "text-amber-400 hover:text-amber-300" : "text-zinc-500 hover:text-zinc-300"}
-                          onClick={() => {
-                            if (tx.locked_at !== null) {
-                              setUnlockingTxId(tx.id);
-                            } else {
-                              lockMutation.mutate({ id: tx.id, assetId: tx.asset.id });
-                            }
-                          }}
-                          disabled={lockMutation.isPending}
-                        >
-                          {tx.locked_at !== null ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
-                        </Button>
+                        {tx.tx_type !== "snapshot" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title={tx.locked_at !== null ? "Locked — click to unlock" : "Lock transaction"}
+                            className={tx.locked_at !== null ? "text-amber-400 hover:text-amber-300" : "text-zinc-500 hover:text-zinc-300"}
+                            onClick={() => {
+                              if (tx.locked_at !== null) {
+                                setUnlockingTxId(tx.id);
+                              } else {
+                                lockMutation.mutate({ id: tx.id, assetId: tx.asset.id });
+                              }
+                            }}
+                            disabled={lockMutation.isPending}
+                          >
+                            {tx.locked_at !== null ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

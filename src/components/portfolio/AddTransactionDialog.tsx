@@ -45,7 +45,12 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
   const [quantity, setQuantity] = useState(transaction ? String(transaction.quantity) : "");
   const [priceUsd, setPriceUsd] = useState(transaction ? String(transaction.price_usd) : "");
   const [totalAmount, setTotalAmount] = useState("");
-  const [date, setDate] = useState(transaction ? tsToDateStr(transaction.ts) : () => new Date().toISOString().slice(0, 10));
+  const [unknownDate, setUnknownDate] = useState(transaction !== undefined && transaction.ts === 0);
+  const [date, setDate] = useState(
+    transaction && transaction.ts !== 0
+      ? tsToDateStr(transaction.ts)
+      : new Date().toISOString().slice(0, 10)
+  );
   const [notes, setNotes] = useState(transaction?.notes ?? "");
   const [error, setError] = useState("");
   const { data: assets } = useAssets();
@@ -60,6 +65,7 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
     setQuantity("");
     setPriceUsd("");
     setTotalAmount("");
+    setUnknownDate(false);
     setDate(new Date().toISOString().slice(0, 10));
     setNotes("");
     setError("");
@@ -77,7 +83,14 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
     let price: number;
     let qty: number;
 
-    if (inputMode === "conversion") {
+    if (txType === "snapshot") {
+      qty = parseFloat(quantity);
+      if (isNaN(qty) || qty <= 0) {
+        setError("Quantity must be a positive number");
+        return;
+      }
+      price = 0;
+    } else if (inputMode === "conversion") {
       qty = parseFloat(quantity);
       const total = parseFloat(totalAmount);
       if (isNaN(qty) || qty <= 0) {
@@ -114,16 +127,16 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
       }
     }
 
-    if (!isFinite(qty) || qty <= 0 || !isFinite(price) || price <= 0) {
-      setError("Computed values are invalid");
+    if (!isFinite(qty) || qty <= 0) {
+      setError("Computed quantity is invalid");
       return;
     }
-    if (!date) {
-      setError("Date is required");
+    if (txType !== "snapshot" && (!isFinite(price) || price <= 0)) {
+      setError("Computed price is invalid");
       return;
     }
 
-    const ts = Math.floor(new Date(date).getTime() / 1000);
+    const ts = unknownDate ? 0 : Math.floor(new Date(date).getTime() / 1000);
 
     try {
       if (isEdit) {
@@ -199,33 +212,53 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
               <SelectContent>
                 <SelectItem value="buy">Buy</SelectItem>
                 <SelectItem value="sell">Sell</SelectItem>
+                <SelectItem value="snapshot">Balance Snapshot</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex rounded-md bg-zinc-800 p-0.5">
-            <button
-              type="button"
-              className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "quantity" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
-              onClick={() => setInputMode("quantity")}
-            >
-              By Quantity
-            </button>
-            <button
-              type="button"
-              className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "total" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
-              onClick={() => setInputMode("total")}
-            >
-              By Total
-            </button>
-            <button
-              type="button"
-              className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "conversion" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
-              onClick={() => setInputMode("conversion")}
-            >
-              By Conversion
-            </button>
-          </div>
-          {inputMode === "quantity" ? (
+          {txType === "snapshot" ? (
+            <div className="rounded-md border border-zinc-700 bg-zinc-800/40 px-3 py-2 text-xs text-zinc-400">
+              Records how much you hold as of a date, without cost basis. Use this when you have an asset but don't know when or how you acquired it.
+            </div>
+          ) : (
+            <div className="flex rounded-md bg-zinc-800 p-0.5">
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "quantity" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setInputMode("quantity")}
+              >
+                By Quantity
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "total" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setInputMode("total")}
+              >
+                By Total
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${inputMode === "conversion" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setInputMode("conversion")}
+              >
+                By Conversion
+              </button>
+            </div>
+          )}
+          {txType === "snapshot" ? (
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="e.g. 5.0"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </div>
+          ) : inputMode === "quantity" ? (
             <>
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity</Label>
@@ -323,13 +356,26 @@ export function AddTransactionDialog({ assetId, transaction, open: controlledOpe
             </>
           )}
           <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
+            <Label htmlFor="date">Date{txType === "snapshot" ? " (optional)" : ""}</Label>
+            {txType === "snapshot" && (
+              <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={unknownDate}
+                  onChange={(e) => setUnknownDate(e.target.checked)}
+                  className="rounded"
+                />
+                Unknown / from the beginning
+              </label>
+            )}
+            {!unknownDate && (
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>

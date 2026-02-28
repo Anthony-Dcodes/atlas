@@ -27,7 +27,7 @@ export interface PriceCacheMeta {
   last_fetched: number;
 }
 
-export type TxType = "buy" | "sell";
+export type TxType = "buy" | "sell" | "snapshot";
 
 export interface Transaction {
   id: string;
@@ -54,6 +54,7 @@ export interface AssetHoldingSummary {
   total_bought: number;
   total_sold: number;
   total_sold_value: number;
+  snapshot_quantity: number;
   net_quantity: number;
   total_cost_basis: number;
   avg_cost_per_unit: number;

@@ -42,7 +42,9 @@ export function AddAssetDialog() {
   const [name, setName] = useState("");
   const [assetType, setAssetType] = useState<AssetType>("stock");
   const [purchaseMode, setPurchaseMode] = useState<"quantity" | "total" | "conversion">("quantity");
+  const [initialSection, setInitialSection] = useState<"buy" | "snapshot">("buy");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [purchaseUnknownDate, setPurchaseUnknownDate] = useState(false);
   const [purchaseQty, setPurchaseQty] = useState("");
   const [purchaseTotal, setPurchaseTotal] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
@@ -58,7 +60,9 @@ export function AddAssetDialog() {
     setName("");
     setAssetType("stock");
     setPurchaseMode("quantity");
+    setInitialSection("buy");
     setPurchaseDate(new Date().toISOString().slice(0, 10));
+    setPurchaseUnknownDate(false);
     setPurchaseQty("");
     setPurchaseTotal("");
     setPurchasePrice("");
@@ -91,7 +95,10 @@ export function AddAssetDialog() {
 
     let hasAny: boolean;
     let hasAll: boolean;
-    if (purchaseMode === "conversion") {
+    if (initialSection === "snapshot") {
+      hasAny = purchaseQty !== "";
+      hasAll = purchaseQty !== "";
+    } else if (purchaseMode === "conversion") {
       const hasQty = purchaseQty !== "";
       const hasTotal = purchaseTotal !== "";
       hasAny = hasQty || hasTotal;
@@ -111,7 +118,13 @@ export function AddAssetDialog() {
     let parsedQty: number | undefined;
     let parsedPrice: number | undefined;
     if (hasAll) {
-      if (purchaseMode === "conversion") {
+      if (initialSection === "snapshot") {
+        parsedQty = parseFloat(purchaseQty);
+        if (isNaN(parsedQty) || parsedQty <= 0) {
+          setError("Quantity must be a positive number");
+          return;
+        }
+      } else if (purchaseMode === "conversion") {
         const parsedQtyVal = parseFloat(purchaseQty);
         const parsedTotalVal = parseFloat(purchaseTotal);
         if (isNaN(parsedQtyVal) || parsedQtyVal <= 0) {
@@ -156,9 +169,14 @@ export function AddAssetDialog() {
 
     try {
       const asset = await addAsset.mutateAsync({ symbol: symbol.trim(), name: name.trim(), assetType });
-      if (hasAll && parsedQty !== undefined && parsedPrice !== undefined) {
-        const ts = Math.floor(new Date(purchaseDate).getTime() / 1000);
-        await addTransaction(asset.id, "buy", parsedQty, parsedPrice, ts, undefined);
+      if (hasAll && parsedQty !== undefined) {
+        if (initialSection === "snapshot") {
+          const ts = purchaseUnknownDate ? 0 : Math.floor(new Date(purchaseDate).getTime() / 1000);
+          await addTransaction(asset.id, "snapshot", parsedQty, 0, ts, undefined);
+        } else if (parsedPrice !== undefined) {
+          const ts = Math.floor(new Date(purchaseDate).getTime() / 1000);
+          await addTransaction(asset.id, "buy", parsedQty, parsedPrice, ts, undefined);
+        }
       }
       reset();
       setOpen(false);
@@ -269,8 +287,64 @@ export function AddAssetDialog() {
           </div>
           <div className="space-y-3 rounded-md border border-border p-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Initial Purchase (optional)
+              Initial Holdings (optional)
             </p>
+            <div className="flex rounded-md bg-zinc-800 p-0.5">
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${initialSection === "buy" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setInitialSection("buy")}
+              >
+                Purchase
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors ${initialSection === "snapshot" ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-400 hover:text-zinc-300"}`}
+                onClick={() => setInitialSection("snapshot")}
+              >
+                Current Balance
+              </button>
+            </div>
+            {initialSection === "snapshot" ? (
+              <>
+                <div className="rounded-md border border-zinc-700 bg-zinc-800/40 px-3 py-2 text-xs text-zinc-400">
+                  Record how much you currently hold without needing a purchase price or date. P&amp;L will not be calculated for this asset.
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purchaseQty">Quantity</Label>
+                  <Input
+                    id="purchaseQty"
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="e.g. 5.0"
+                    value={purchaseQty}
+                    onChange={(e) => setPurchaseQty(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purchaseDate">Date (optional)</Label>
+                  <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={purchaseUnknownDate}
+                      onChange={(e) => setPurchaseUnknownDate(e.target.checked)}
+                      className="rounded"
+                    />
+                    Unknown / from the beginning
+                  </label>
+                  {!purchaseUnknownDate && (
+                    <Input
+                      id="purchaseDate"
+                      type="date"
+                      value={purchaseDate}
+                      onChange={(e) => setPurchaseDate(e.target.value)}
+                    />
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
             <div className="flex rounded-md bg-zinc-800 p-0.5">
               <button
                 type="button"
@@ -385,6 +459,8 @@ export function AddAssetDialog() {
               <div className="rounded-md bg-zinc-800/50 px-3 py-2 text-sm text-zinc-400">
                 Price per unit: <span className="text-zinc-200">${(parseFloat(purchaseTotal) / parseFloat(purchaseQty)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
               </div>
+            )}
+              </>
             )}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
