@@ -9,6 +9,13 @@ import { formatCurrency } from "@/lib/utils/formatCurrency";
 import { formatDate } from "@/lib/utils/dateHelpers";
 import type { Asset, Transaction } from "@/types";
 import { Lock, LockOpen, Pencil, Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TxWithAsset extends Transaction {
   asset: Asset;
@@ -17,6 +24,7 @@ interface TxWithAsset extends Transaction {
 export function TransactionsPage() {
   const { data: assets, isLoading: assetsLoading } = useAssets();
   const queryClient = useQueryClient();
+  const [filterAssetId, setFilterAssetId] = useState<string | null>(null);
   const [editingTx, setEditingTx] = useState<TxWithAsset | null>(null);
   const [unlockingTxId, setUnlockingTxId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -61,13 +69,41 @@ export function TransactionsPage() {
       .sort((a, b) => b.ts - a.ts);
   }, [assets, txResults]);
 
+  const displayedTransactions = useMemo<TxWithAsset[]>(
+    () =>
+      filterAssetId
+        ? allTransactions.filter((tx) => tx.asset.id === filterAssetId)
+        : allTransactions,
+    [allTransactions, filterAssetId],
+  );
+
   const isLoading = assetsLoading || txResults.some((r) => r.isLoading);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-zinc-100">Transactions</h2>
-        <AddTransactionDialog />
+        <div className="flex items-center gap-2">
+          {assets && assets.length > 0 && (
+            <Select
+              value={filterAssetId ?? "all"}
+              onValueChange={(v) => setFilterAssetId(v === "all" ? null : v)}
+            >
+              <SelectTrigger className="h-8 w-44 text-sm">
+                <SelectValue placeholder="All assets" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All assets</SelectItem>
+                {assets.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.symbol}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <AddTransactionDialog />
+        </div>
       </div>
 
       {isLoading && <p className="text-muted-foreground">Loading transactions...</p>}
@@ -78,7 +114,13 @@ export function TransactionsPage() {
         </p>
       )}
 
-      {!isLoading && allTransactions.length > 0 && (
+      {!isLoading && allTransactions.length > 0 && displayedTransactions.length === 0 && (
+        <p className="text-muted-foreground">
+          No transactions for {assets?.find((a) => a.id === filterAssetId)?.symbol ?? "this asset"}.
+        </p>
+      )}
+
+      {!isLoading && allTransactions.length > 0 && displayedTransactions.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
           <table className="w-full text-sm">
             <thead>
@@ -105,7 +147,7 @@ export function TransactionsPage() {
               </tr>
             </thead>
             <tbody>
-              {allTransactions.map((tx) => (
+              {displayedTransactions.map((tx) => (
                 <tr key={tx.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                   <td className="px-4 py-3 text-zinc-300">{tx.ts === 0 ? <span className="text-zinc-500 italic">Unknown date</span> : formatDate(tx.ts)}</td>
                   <td className="px-4 py-3">
