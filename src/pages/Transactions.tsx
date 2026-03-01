@@ -228,6 +228,7 @@ export function TransactionsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="hover:text-red-400"
                           onClick={() => {
                             if (tx.locked_at !== null) {
                               setConfirmDeleteId(tx.id);
