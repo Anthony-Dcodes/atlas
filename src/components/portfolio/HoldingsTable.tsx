@@ -55,7 +55,7 @@ export function HoldingsTable({ rows, onSelect }: Props) {
             >
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2.5">
-                  <span style={{ color: row.color }} className="shrink-0 text-xs leading-none">●</span>
+                  <span style={{ backgroundColor: row.color }} className="inline-block h-2 w-2 shrink-0 rounded-full" />
                   <div className="min-w-0">
                     <div className="font-semibold leading-tight text-zinc-100">{row.asset.symbol}</div>
                     <div className="truncate text-xs leading-tight text-zinc-500">{row.asset.name}</div>

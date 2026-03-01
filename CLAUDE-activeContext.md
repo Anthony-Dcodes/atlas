@@ -33,11 +33,11 @@
 - Add Asset dialog: search/autocomplete, Initial Purchase section (By Quantity/Total/Conversion input modes)
 - AddTransactionDialog: Year/Month/Day Select dropdowns for date entry (replaces `<input type="date">`); edit mode pre-fills from existing transaction timestamp
 - Settings: API key management, refresh interval, about
-- Transactions page: BUY/SELL badges only; lock icon always shown (no snapshot exception)
+- Transactions page: BUY/SELL badges only; lock icon always shown; asset filter dropdown in header; sticky column headers (thead sticky top-0 z-10, table container overflow-y-auto max-h-[calc(100vh-12rem)])
 - Asset Manager page: shows all assets (active + deleted); Provider column with colored badge (Binance/Twelve Data/CoinGecko); inline Purge with confirmation
 - Dark theme with Tailwind CSS v4 variables
 - `priceUtils.ts` — `calcChange(sortedPrices, daysBack)` pure function
-- `assetColors.ts` — `buildColorMap(assets)` deterministic per-type color palettes
+- `assetColors.ts` — `buildColorMap(assets)` global 12-color sequential palette (by added_at)
 
 ## Recent Decisions (This Session)
 - **Snapshot tx_type removed**: DB migration converts existing `snapshot` rows to `buy`; `TxType = "buy" | "sell"` only; `AssetHoldingSummary` no longer has `snapshot_quantity`; `net_quantity = total_bought - total_sold`; P&L now computed for ALL held assets (no suppression)
@@ -46,6 +46,11 @@
 - **Provider column in Asset Manager**: `list_all_cache_meta` Rust query + command + `listCacheMeta` TS wrapper + `useAllCacheMeta` hook; colored badge per provider
 - **24h column removed from HoldingsTable**: cleaner table; `min-w` reduced from 800px to 700px
 - **AddAssetDialog "Current Balance" tab removed**: renamed section to "Initial Purchase" only; `purchaseUnknownDate` state removed
+- **Transactions asset filter**: Select dropdown in header filters table by asset; local `filterAssetId` state; `displayedTransactions` useMemo; contextual empty state message; resets on navigation
+- **Transactions sticky headers**: table container changed to `overflow-y-auto max-h-[calc(100vh-12rem)]`; `<thead className="sticky top-0 z-10">`; header `<tr>` gets `bg-zinc-900` for opaque background
+- **P&L unrealized only**: Dashboard + HoldingSummary now show pure unrealized P&L — `currentValue - currently_invested` for long/mixed; `currentValue + total_sold_value` for pure shorts; `totalCurrentlyInvested` replaces `totalCostBasis + totalSoldValue` as portfolio P&L % basis; realized gains removed from these views (belong in Realized P&L tab)
+- **Ghost button micro-animations**: `hover:scale-110 active:scale-95` added to ghost variant in `button.tsx` — all ghost icon buttons (Pencil, Lock, Trash2, Purge, Yes/Cancel) get tactile feedback; Trash2 delete gets `hover:text-red-400` for destructive intent signal
+- **Asset color redesign**: 12-color globally distinct palette in `assetColors.ts`; global sequential assignment by `added_at` (no type grouping); dots replaced with 8×8px CSS circles (`inline-block h-2 w-2 rounded-full` with `backgroundColor`); AllocationBar gets `gap-px bg-zinc-950` for 1px dark separators; segments use `flexGrow + minWidth:6px` instead of fixed width%
 
 ## Next Steps (Phase 1 Polish)
 1. Run `npm run tauri dev` to verify full app works end-to-end
