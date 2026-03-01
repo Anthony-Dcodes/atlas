@@ -15,10 +15,12 @@ export function HoldingSummary({ assetId, currentPrice }: Props) {
 
   const isShort = summary.total_bought === 0;
   const currentValue = summary.net_quantity * currentPrice;
-  const pnl = currentValue + summary.total_sold_value - summary.total_cost_basis;
-  const pnlBasis = summary.total_cost_basis > 0 ? summary.total_cost_basis : summary.total_sold_value;
-  const pnlPercent = pnlBasis > 0 ? (pnl / pnlBasis) * 100 : 0;
   const currentlyInvested = summary.net_quantity * summary.avg_cost_per_unit;
+  const pnl = isShort
+    ? currentValue + summary.total_sold_value   // pure short: proceeds − cost to close
+    : currentValue - currentlyInvested;          // long/mixed: unrealized only
+  const pnlBasis = isShort ? summary.total_sold_value : currentlyInvested;
+  const pnlPercent = pnlBasis !== 0 ? (pnl / Math.abs(pnlBasis)) * 100 : 0;
 
   if (isShort) {
     // Pure short: Net Qty | Avg Entry | Short Proceeds | Current Value | P&L

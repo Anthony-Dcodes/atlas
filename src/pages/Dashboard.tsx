@@ -54,10 +54,9 @@ export function Dashboard() {
     const allPrices = new Map<string, OHLCVRow[]>();
     let totalValue = 0;
     let totalValue24hAgo = 0;
-    let totalCostBasis = 0;
-    let totalSoldValue = 0;
     let totalLongValue = 0;
     let totalUnrealizedPnL = 0;
+    let totalCurrentlyInvested = 0;
 
     const assetPrices = assets.map((asset, i) => {
       const data = priceResults[i]?.data ?? [];
@@ -81,9 +80,11 @@ export function Dashboard() {
         totalValue24hAgo += holding.net_quantity * price24hAgo;
 
         const currentValue = holding.net_quantity * latestPrice;
-        const pnl = currentValue + holding.total_sold_value - holding.total_cost_basis;
-        totalCostBasis += holding.total_cost_basis;
-        totalSoldValue += holding.total_sold_value;
+        const currentlyInvested = holding.net_quantity * holding.avg_cost_per_unit;
+        const pnl = holding.total_bought > 0
+          ? currentValue - currentlyInvested
+          : currentValue + holding.total_sold_value; // pure short: proceeds − cost to close
+        totalCurrentlyInvested += holding.total_bought > 0 ? currentlyInvested : holding.total_sold_value;
         totalUnrealizedPnL += pnl;
       }
 
@@ -93,9 +94,8 @@ export function Dashboard() {
     const change24hValue = totalValue - totalValue24hAgo;
     const change24hPct =
       totalValue24hAgo > 0 ? (change24hValue / totalValue24hAgo) * 100 : 0;
-    const totalPnLBasis = totalCostBasis + totalSoldValue;
     const totalPnLPct =
-      totalPnLBasis > 0 ? (totalUnrealizedPnL / totalPnLBasis) * 100 : 0;
+      totalCurrentlyInvested > 0 ? (totalUnrealizedPnL / totalCurrentlyInvested) * 100 : 0;
 
     const holdingRows = assetPrices.map(({ asset, sorted, latestPrice, holding, isHeld }, i) => {
       let netQty = 0;
@@ -106,9 +106,12 @@ export function Dashboard() {
       if (isHeld && holding && latestPrice !== null) {
         netQty = holding.net_quantity;
         assetValue = holding.net_quantity * latestPrice;
-        unrealizedPnL = assetValue + holding.total_sold_value - holding.total_cost_basis;
-        const pnlBasis = holding.total_cost_basis > 0 ? holding.total_cost_basis : holding.total_sold_value;
-        pnlPct = pnlBasis > 0 ? (unrealizedPnL / pnlBasis) * 100 : 0;
+        const currentlyInvested = holding.net_quantity * holding.avg_cost_per_unit;
+        unrealizedPnL = holding.total_bought > 0
+          ? assetValue - currentlyInvested
+          : assetValue + holding.total_sold_value; // pure short
+        const pnlBasis = holding.total_bought > 0 ? currentlyInvested : holding.total_sold_value;
+        pnlPct = pnlBasis !== 0 ? (unrealizedPnL / Math.abs(pnlBasis)) * 100 : 0;
       } else if (isHeld && holding) {
         netQty = holding.net_quantity;
       }
