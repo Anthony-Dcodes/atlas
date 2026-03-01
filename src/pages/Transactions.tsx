@@ -121,10 +121,10 @@ export function TransactionsPage() {
       )}
 
       {!isLoading && allTransactions.length > 0 && displayedTransactions.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
+        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-zinc-800 bg-zinc-900">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   Date
                 </th>
