@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
 import { useNavigationStore, type Page } from "@/stores/navigationStore";
-import { LayoutDashboard, Receipt, TrendingUp, Database, Settings } from "lucide-react";
+import { LayoutDashboard, Receipt, TrendingUp, Activity, Database, Settings } from "lucide-react";
 
 const navItems: { page: Page; label: string; icon: typeof LayoutDashboard }[] = [
   { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { page: "transactions", label: "Transactions", icon: Receipt },
   { page: "realized-pnl", label: "Realized P&L", icon: TrendingUp },
+  { page: "performance", label: "Performance", icon: Activity },
   { page: "asset-manager", label: "Asset Manager", icon: Database },
   { page: "settings", label: "Settings", icon: Settings },
 ];

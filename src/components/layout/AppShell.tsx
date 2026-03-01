@@ -6,6 +6,7 @@ import { TransactionsPage } from "@/pages/Transactions";
 import { AssetManagerPage } from "@/pages/AssetManager";
 import { SettingsPage } from "@/pages/Settings";
 import { RealizedPnLPage } from "@/pages/RealizedPnL";
+import { PerformancePage } from "@/pages/Performance";
 
 export function AppShell() {
   const { activePage } = useNavigationStore();
@@ -19,6 +20,7 @@ export function AppShell() {
           {activePage === "dashboard" && <Dashboard />}
           {activePage === "transactions" && <TransactionsPage />}
           {activePage === "realized-pnl" && <RealizedPnLPage />}
+          {activePage === "performance" && <PerformancePage />}
           {activePage === "asset-manager" && <AssetManagerPage />}
           {activePage === "settings" && <SettingsPage />}
         </main>

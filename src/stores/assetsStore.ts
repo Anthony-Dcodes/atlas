@@ -6,6 +6,8 @@ interface AssetsState {
   setSelectedAssetId: (id: string | null) => void;
   portfolioTimeRange: TimeRange;
   setPortfolioTimeRange: (range: TimeRange) => void;
+  performanceTimeRange: TimeRange;
+  setPerformanceTimeRange: (range: TimeRange) => void;
 }
 
 export const useAssetsStore = create<AssetsState>((set) => ({
@@ -13,4 +15,6 @@ export const useAssetsStore = create<AssetsState>((set) => ({
   setSelectedAssetId: (id) => set({ selectedAssetId: id }),
   portfolioTimeRange: "1y",
   setPortfolioTimeRange: (range) => set({ portfolioTimeRange: range }),
+  performanceTimeRange: "all",
+  setPerformanceTimeRange: (range) => set({ performanceTimeRange: range }),
 }));
